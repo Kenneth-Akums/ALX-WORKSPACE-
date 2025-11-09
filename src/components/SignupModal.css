@@ -1,0 +1,147 @@
+/* --- Modal Layout --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  /* Guidelines: Overlay modal (backdrop blur) */
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-content {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem; /* rounded-lg */
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  width: 100%;
+  max-width: 28rem; /* sm:max-w-md */
+  padding: 1.5rem; /* p-6 */
+  display: grid;
+  gap: 1.25rem; /* space-y-4 + my-2 */
+}
+
+/* --- Modal Header --- */
+.modal-header {
+  display: grid;
+  gap: 1rem; /* space-y-4 */
+  text-align: center;
+}
+
+.modal-icon-wrapper {
+  /* Guidelines: Icon: Informational icon (alert circle) */
+  width: 3rem; /* w-12 */
+  height: 3rem; /* h-12 */
+  border-radius: 9999px; /* rounded-full */
+  background-color: hsla(var(--primary), 0.1); /* bg-primary/10 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline: auto; /* mx-auto */
+}
+
+.modal-icon {
+  width: 1.5rem; /* w-6 */
+  height: 1.5rem; /* h-6 */
+  color: hsl(var(--primary)); /* text-primary */
+}
+
+.modal-title-group {
+  display: grid;
+  gap: 0.5rem; /* space-y-2 */
+}
+
+.modal-title {
+  /* Guidelines: Heading: "Complete Your Registration" */
+  font-size: 1.5rem; /* text-2xl */
+  font-weight: 700; /* font-bold */
+}
+
+.modal-description {
+  /* Guidelines: Body text: Clear explanation */
+  font-size: 1rem; /* text-base */
+  color: hsl(var(--muted-foreground));
+}
+
+.modal-email {
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+
+/* --- Modal Info Box --- */
+.modal-info-box {
+  /* Guidelines: Email confirmation: "We've sent instructions..." */
+  background-color: hsla(var(--muted), 0.5); /* bg-muted/50 */
+  border-radius: 0.5rem; /* rounded-lg */
+  padding: 1rem; /* p-4 */
+  text-align: center;
+  font-size: 0.875rem; /* text-sm */
+  line-height: 1.25rem;
+}
+
+/* --- Modal Footer --- */
+.modal-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem; /* gap-2 */
+}
+
+
+/* --- Button Styles (from EmailVerification.css) --- */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem; /* gap-2 */
+  white-space: nowrap;
+  border-radius: 0.5625rem; /* 9px */
+  font-size: 1rem; /* 16px */
+  font-weight: 500;
+  padding: 0.75rem 1.5rem; /* 12px 24px */
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  width: 100%;
+}
+
+.button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.button svg {
+  width: 1rem; /* h-4 w-4 */
+  height: 1rem;
+}
+
+/* Primary Button Variant */
+.button.button-primary {
+  /* Guidelines: Primary button: "Go to Sign Up" */
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(var(--primary-border));
+}
+
+.button.button-primary:hover:not(:disabled) {
+  box-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.1);
+}
+
+/* Outline Button Variant */
+.button.button-outline {
+  /* Guidelines: Secondary action: "Try Different Email" */
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  /* Guidelines: Outlined style (border-2) - using 1px from index.css */
+  border: 1px solid hsl(var(--button-outline));
+}
+
+.button.button-outline:hover:not(:disabled) {
+  background-color: hsl(var(--elevate-1));
+}

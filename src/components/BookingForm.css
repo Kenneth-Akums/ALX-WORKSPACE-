@@ -1,0 +1,40 @@
+.booking-page-container {
+  /* Guidelines: Centered layouts with comfortable vertical padding (py-12 to py-16) */
+  padding: 3rem 1rem; /* 48px 16px */
+  background-color: hsl(var(--background));
+  min-height: 100vh;
+}
+
+.booking-page-content {
+  /* Guidelines: Main booking interface: max-w-4xl mx-auto */
+  max-width: 56rem; /* 896px */
+  margin-inline: auto;
+  display: grid;
+  gap: 2rem; /* space-y-8 */
+}
+
+.card-header-welcome {
+  text-align: center;
+}
+
+.card-header-welcome .card-logo img {
+  height: 2.5rem; /* h-10 */
+  margin-inline: auto;
+}
+
+.card-header-welcome .card-title {
+  /* Guidelines: text-2xl (from original component) */
+  font-size: 1.5rem; /* 24px */
+  line-height: 2rem;
+}
+
+.booking-page-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 1rem; /* pt-4 */
+}
+
+.booking-page-footer .button-lg {
+  /* Guidelines: fixed width on desktop (min-w-[200px]) */
+  min-width: 200px;
+}

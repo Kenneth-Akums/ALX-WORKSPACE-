@@ -1,0 +1,126 @@
+/* --- Animation --- */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+/* --- Base Card Component --- */
+.card {
+  width: 100%;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--card-border));
+  /* Guidelines: rounded-xl from original component */
+  border-radius: 0.75rem; 
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.card-header {
+  padding: 1.5rem; /* p-6 */
+  display: grid;
+  gap: 1rem; /* space-y-4 */
+}
+
+.card-content {
+  padding: 1.5rem; /* p-6 */
+  padding-top: 0; /* pt-0 */
+}
+
+.card-title {
+  /* Guidelines: Page titles: text-3xl font-bold */
+  font-size: 1.875rem; /* 30px */
+  line-height: 2.25rem;
+  font-weight: 700;
+}
+
+.card-description {
+  font-size: 1rem; /* 16px */
+  color: hsl(var(--muted-foreground));
+}
+
+.text-primary {
+  color: hsl(var(--primary));
+}
+
+/* --- Base Button Component --- */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem; /* gap-2 */
+  white-space: nowrap;
+  /* Guidelines: Rounded: rounded-lg */
+  border-radius: 0.5625rem; /* 9px */
+  /* Guidelines: Font: text-base font-medium */
+  font-size: 1rem; /* 16px */
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.button svg {
+  width: 1rem; /* h-4 w-4 */
+  height: 1rem;
+}
+
+/* --- Button Variants --- */
+.button.button-primary {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(var(--primary-border));
+}
+
+.button.button-primary:hover:not(:disabled) {
+  /* Guidelines: Shadow on hover: subtle elevation */
+  box-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.1);
+}
+
+.button.button-outline {
+  background-color: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--button-outline));
+}
+
+.button.button-outline:hover:not(:disabled) {
+  background-color: hsl(var(--elevate-1));
+}
+
+/* --- Button Sizes --- */
+.button.button-default {
+  /* Guidelines: Padding: px-6 py-3 (from design) */
+  padding: 0.75rem 1.5rem; /* 12px 24px */
+}
+
+.button.button-lg {
+  /* Guidelines: min-h-10 px-8 (from original button) */
+  min-height: 2.5rem; /* 40px */
+  padding-left: 2rem;  /* 32px */
+  padding-right: 2rem; /* 32px */
+}
+
+/* --- Utility Classes (Add to components.css) --- */
+.hover-elevate:hover:not(:disabled) {
+  /* Guidelines: Button hovers: Slight elevation (2px lift) */
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transform: translateY(-2px);
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.active-elevate-2:active:not(:disabled) {
+  /* Guidelines: Seat selection: Subtle scale on click (1.02x) */
+  transform: translateY(0) scale(0.98);
+}

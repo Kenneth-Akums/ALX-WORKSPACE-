@@ -1,0 +1,109 @@
+/* --- Confirmation Page Layout --- */
+.confirmation-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1rem;
+  background-color: hsl(var(--background));
+}
+
+.confirmation-card {
+  width: 100%;
+  /* Guidelines: Email verification step: max-w-md mx-auto */
+  max-width: 28rem; /* 448px */
+}
+
+.confirmation-header {
+  text-align: center;
+  padding-bottom: 1rem; /* pb-4 */
+}
+
+.confirmation-icon-wrapper {
+  width: 4rem; /* w-16 */
+  height: 4rem; /* h-16 */
+  border-radius: 9999px; /* rounded-full */
+  background-color: hsla(var(--primary), 0.1); /* bg-primary/10 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline: auto; /* mx-auto */
+}
+
+.confirmation-icon {
+  width: 2rem; /* w-8 */
+  height: 2rem; /* h-8 */
+  color: hsl(var(--primary)); /* text-primary */
+}
+
+.confirmation-header .card-title {
+  /* Guidelines: Page titles: text-3xl font-bold */
+  font-size: 1.875rem; /* 30px */
+}
+
+.confirmation-header .card-description {
+  margin-top: 0.5rem; /* mt-2 */
+}
+
+.confirmation-content {
+  display: grid;
+  gap: 1rem; /* space-y-4 */
+}
+
+/* --- Details Box --- */
+.details-box {
+  background-color: hsla(var(--primary), 0.05); /* bg-primary/5 */
+  border-radius: 0.5rem; /* rounded-lg */
+  padding: 1.5rem; /* p-6 */
+  display: grid;
+  gap: 1rem; /* space-y-4 */
+}
+
+.detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem; /* gap-3 */
+}
+
+.detail-icon {
+  width: 1.25rem; /* w-5 */
+  height: 1.25rem; /* h-5 */
+  color: hsl(var(--primary));
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.detail-text {
+  flex: 1;
+  min-width: 0; /* Prevents overflow */
+}
+
+.detail-label {
+  font-size: 0.875rem; /* text-sm */
+  color: hsl(var(--muted-foreground));
+}
+
+.detail-value {
+  font-weight: 500; /* font-medium */
+  word-break: break-all; /* break-all */
+}
+
+.detail-value-large {
+  /* Guidelines: Selected seat number (large, prominent) */
+  font-size: 1.5rem; /* text-2xl */
+  font-weight: 700; /* font-bold */
+}
+
+/* --- Info Box --- */
+.info-box {
+  background-color: hsla(var(--muted), 0.5); /* bg-muted/50 */
+  border-radius: 0.5rem; /* rounded-lg */
+  padding: 1rem; /* p-4 */
+  text-align: center;
+  font-size: 0.875rem; /* text-sm */
+  color: hsl(var(--muted-foreground));
+}
+
+.confirmation-content .button-outline {
+  width: 100%; /* w-full */
+}
