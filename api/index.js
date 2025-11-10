@@ -2,12 +2,12 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import { google } from "googleapis";
-import path from "path";
-import { fileURLToPath } from "url";
+// We no longer need 'path' or 'fileURLToPath'
+// import path from "path";
+// import { fileURLToPath } from "url";
 
 // --- START: express setup ---
 const app = express();
-// app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 const allowedOrigins = [
   "http://localhost:5173",
   "https://alx-workspace-cyan.vercel.app"
@@ -26,22 +26,32 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // --- START: googleSheets.js logic ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// Look for credentials in the *current* /api folder
-const KEY_FILE_PATH = path.join(__dirname, "google-credentials.json");
+
+// --- NEW AUTHENTICATION METHOD ---
+// Read keys directly from Vercel's environment variables
+const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
+const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
+// --- END NEW AUTHENTICATION METHOD ---
 
 const BOOKINGS_SHEET_ID = process.env.BOOKINGS_SHEET_ID;
 const LEARNERS_SHEET_ID = process.env.LEARNERS_SHEET_ID;
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 async function getSheetsClient() {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: KEY_FILE_PATH,
-    scopes: SCOPES,
-  });
-  const authClient = await auth.getClient();
-  return google.sheets({ version: "v4", auth: authClient });
+  if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+    console.error("Missing Google auth environment variables");
+    throw new Error("Server auth configuration error.");
+  }
+  
+  const auth = new google.auth.JWT(
+    GOOGLE_CLIENT_EMAIL,
+    null,
+    GOOGLE_PRIVATE_KEY, // The key itself, not the file path
+    SCOPES
+  );
+
+  await auth.authorize(); // Authorize the client
+  return google.sheets({ version: "v4", auth });
 }
 
 async function isEmailApproved(email) {
@@ -128,6 +138,4 @@ app.use((err, req, res, next) => {
 });
 
 // --- Vercel Export ---
-// This is the most important part!
-// It exports the express app as the default serverless function.
 export default app;
