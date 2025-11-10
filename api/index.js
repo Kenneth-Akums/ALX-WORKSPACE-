@@ -52,14 +52,15 @@ async function getSheetsClient() {
     console.error("Missing Google auth environment variables");
     throw new Error("Server auth configuration error.");
   }
+
+  // Parse the private key correctly, handling newlines
+  const privateKey = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
   
-  // This is the part that was missing:
-  const auth = new google.auth.JWT(
-    GOOGLE_CLIENT_EMAIL,
-    null,
-    GOOGLE_PRIVATE_KEY, // The key itself, not the file path
-    SCOPES
-  );
+  const auth = new google.auth.JWT({
+    email: GOOGLE_CLIENT_EMAIL,
+    key: privateKey,
+    scopes: SCOPES
+  });
 
   await auth.authorize(); // Authorize the client
   return google.sheets({ version: "v4", auth });
