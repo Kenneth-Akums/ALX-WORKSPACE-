@@ -38,11 +38,22 @@ const LEARNERS_SHEET_ID = process.env.LEARNERS_SHEET_ID;
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 async function getSheetsClient() {
+  // --- NEW DEBUG LOGGING ---
+  console.log("Checking for Google auth variables...");
+  if (!GOOGLE_CLIENT_EMAIL) {
+    console.error("GOOGLE_CLIENT_EMAIL is NOT SET.");
+  }
+  if (!GOOGLE_PRIVATE_KEY) {
+    console.error("GOOGLE_PRIVATE_KEY is NOT SET.");
+  }
+  // --- END DEBUG LOGGING ---
+
   if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY) {
     console.error("Missing Google auth environment variables");
     throw new Error("Server auth configuration error.");
   }
   
+  // This is the part that was missing:
   const auth = new google.auth.JWT(
     GOOGLE_CLIENT_EMAIL,
     null,
