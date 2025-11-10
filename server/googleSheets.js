@@ -1,12 +1,17 @@
 import { google } from "googleapis";
 import path from "path";
 import "dotenv/config"; // Make sure .env variables are loaded
+import { fileURLToPath } from "url"; // Import this built-in Node.js helper
 
-// Path to your service account key file
-const KEY_FILE_PATH = path.join(import.meta.dirname, "google-credentials.json");
 
-// Your Google Sheet ID from the .env file
-const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const KEY_FILE_PATH = path.join(__dirname, "google-credentials.json");
+
+    
+// const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
+const BOOKINGS_SHEET_ID = process.env.BOOKINGS_SHEET_ID;
+const LEARNERS_SHEET_ID = process.env.LEARNERS_SHEET_ID;
 
 // Define the scopes for the Google Sheets API
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -21,15 +26,50 @@ async function getSheetsClient() {
   return google.sheets({ version: "v4", auth: authClient });
 }
 
-// Data to be sent from the frontend
-// (TypeScript interface removed)
+export async function isEmailApproved(email) {
+  // --- UPDATED ---
+  if (!LEARNERS_SHEET_ID) {
+    console.error("LEARNERS_SHEET_ID is not set in .env file.");
+    throw new Error("Learner Sheet configuration is missing.");
+  }
+  // --- END UPDATE ---
 
-/**
- * Appends a new booking row to the Google Sheet.
- */
+  try {
+    const sheets = await getSheetsClient();
+    // This assumes your "Learners" sheet has a tab named "Approved_Learners"
+    const range = "Approved_Learners!A:A"; 
+
+    const response = await sheets.spreadsheets.values.get({
+      // --- UPDATED ---
+      spreadsheetId: LEARNERS_SHEET_ID,
+      // --- END UPDATE ---
+      range: range,
+    });
+
+    const values = response.data.values;
+    if (!values || values.length === 0) {
+      console.log("No approved learners found in sheet.");
+      return false; // Sheet is empty or no data
+    }
+
+    // Flatten array (e.g., [['a@b.com'], ['c@d.com']])
+    // and convert to lowercase for case-insensitive matching
+    const approvedEmails = values.flat().map(e => e.toLowerCase());
+    
+    // Check if the email exists in the list
+    return approvedEmails.includes(email.toLowerCase());
+
+  } catch (err) {
+    console.error("Error checking email in Google Sheet:", err);
+    // Re-throw the original error to be caught by the route handler
+    throw new Error(err.message || "Failed to check email in Google Sheet.");
+  }
+}
+
+
 export async function appendBooking(data) { // Type annotation removed
-  if (!SPREADSHEET_ID) {
-    console.error("GOOGLE_SHEET_ID is not set in .env file.");
+  if (!BOOKINGS_SHEET_ID) {
+    console.error("BOOKINGS_SHEET_ID is not set in .env file.");
     throw new Error("Google Sheet configuration is missing.");
   }
 
@@ -48,8 +88,8 @@ export async function appendBooking(data) { // Type annotation removed
     ];
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: "Bookings!A:E", // Assumes your sheet is named "Bookings"
+      spreadsheetId: BOOKINGS_SHEET_ID,
+      range: "Bookings!A:E", 
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: values,
@@ -61,6 +101,6 @@ export async function appendBooking(data) { // Type annotation removed
 
   } catch (err) {
     console.error("Error appending data to Google Sheet:", err);
-    throw new Error("Failed to save booking to Google Sheet.");
+    throw new Error(err.message || "Failed to save booking to Google Sheet.");
   }
 }

@@ -11,20 +11,33 @@ export default function EmailVerification({ onVerified, onUnverified }) {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate API call
-    console.log("Verifying email:", email);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // TODO: Replace with actual API call to check email
-    // For demo: emails ending with @alx.com are verified
-    const isVerified = email.toLowerCase().endsWith("@alx.com");
-    
-    setIsLoading(false);
-    
-    if (isVerified) {
-      onVerified(email);
-    } else {
-      onUnverified(email);
+   try {
+      // --- THIS IS THE NEW LOGIC ---
+      const response = await fetch("/api/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        // If the server itself failed, treat as unverified
+        throw new Error("Server verification failed");
+      }
+
+      const data = await response.json();
+
+      if (data.isVerified) {
+        onVerified(email);
+      } else {
+        onUnverified(email);
+      }
+      // --- END OF NEW LOGIC ---
+
+    } catch (error) {
+      console.error("Email verification error:", error);
+      onUnverified(email); // Show modal on any error
+    } finally {
+      setIsLoading(false);
     }
   };
 
