@@ -88,3 +88,20 @@
   font-weight: 500; /* font-medium */
   color: hsl(var(--primary));
 }
+
+
+.hub-card-seats.text-destructive {
+  color: hsl(var(--destructive));
+}
+
+/* --- ADD THIS NEW CLASS --- */
+.hub-card.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: hsl(var(--muted));
+}
+
+.hub-card.is-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}

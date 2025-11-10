@@ -88,3 +88,18 @@
 .day-card-availability.text-destructive {
   color: hsl(var(--destructive));
 }
+
+.day-card-availability {
+  font-size: 0.75rem; /* text-xs */
+  font-weight: 500; /* font-medium */
+  padding-top: 0.25rem; /* pt-1 */
+  border-top: 1px solid hsl(var(--border));
+  color: hsl(var(--primary)); /* Default color */
+}
+
+/* --- ADD THIS NEW CLASS --- */
+.day-card-availability.text-destructive-light {
+  color: hsl(var(--destructive));
+  opacity: 0.9;
+}
+

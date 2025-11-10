@@ -1,40 +1,34 @@
-import { format, addDays } from "date-fns";
+import { format, parse } from "date-fns";
 import { Calendar } from "lucide-react";
-import "./components.css"; // Shared component styles
-import "./DaySelector.css";  // Component-specific styles
+import "./components.css";
+import "./DaySelector.css";
 
+// --- Props are simplified. We only need the booked counts. ---
 export default function DaySelector({ 
   selectedDate, 
   onSelectDate,
-  availabilityByDate = {},
-  totalSeats = 50
+  dayList = [],
+  availabilityForSelectedHub = {}
 }) {
-  // Generate days excluding Sundays
-  const days = [];
-  let currentOffset = 0;
-  
-  while (days.length < 5) {
-    const date = addDays(new Date(), currentOffset);
-    const dayOfWeek = date.getDay();
-    
-    // Skip Sundays (0 = Sunday)
-    if (dayOfWeek !== 0) {
-      const dateStr = format(date, "yyyy-MM-dd");
-      const available = availabilityByDate[dateStr] ?? totalSeats;
-      
-      days.push({
-        date: dateStr,
-        dayName: format(date, "EEEE"),
-        dayNumber: format(date, "d"),
-        monthName: format(date, "MMM"),
-        available,
-      });
-    }
-    
-    currentOffset++;
-  }
+// --- END UPDATE ---
 
-  // Helper function to replace cn()
+  const days = dayList.map(dateStr => {
+    const dateObj = parse(dateStr, "yyyy-MM-dd", new Date());
+    
+    // Use the new, pre-filtered data
+    const bookedCount = availabilityForSelectedHub[dateStr] || 0;
+    
+    return {
+      date: dateStr,
+      dayName: format(dateObj, "EEEE"),
+      dayNumber: format(dateObj, "d"),
+      monthName: format(dateObj, "MMM"),
+      // --- UPDATED: Use bookedCount ---
+      bookedCount: bookedCount,
+      // --- END UPDATE ---
+    };
+  });
+
   const classNames = (...classes) => {
     return classes.filter(Boolean).join(' ');
   }
@@ -72,12 +66,16 @@ export default function DaySelector({
               <div className="day-card-month">
                 {day.monthName}
               </div>
+              
+              {/* --- UPDATED: Show "X booked" with red text --- */}
               <div className={classNames(
                 "day-card-availability",
-                day.available > 0 ? "text-primary" : "text-destructive"
+                day.bookedCount > 0 && "text-destructive-light"
               )}>
-                {day.available} seats
+                {day.bookedCount} booked
               </div>
+              {/* --- END UPDATE --- */}
+
             </div>
           </div>
         ))}
