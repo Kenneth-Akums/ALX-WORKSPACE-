@@ -374,7 +374,7 @@ export async function getAllBookings() {
       bookingDate: row[6] || '', // Column G
       timestamp: row[7] || '',   // Column H
       bookingStatus: row[8] || 'Booked', // Column I
-      bookingNotification: row[9] || 'NO' // Column J
+      bookingNotification: row[9] || '' // Column J
     }));
   } catch (err) {
     console.error("Error fetching all bookings:", err);
@@ -406,7 +406,7 @@ export async function appendBooking(data) {
       data.bookingDate,  // G: BookingDate
       timestamp,         // H: Timestamp
       "Booked",          // I: BookingStatus
-      "NO"               // J: BookingNotification
+      ""               // J: BookingNotification
     ]];
     
     await sheets.spreadsheets.values.append({
