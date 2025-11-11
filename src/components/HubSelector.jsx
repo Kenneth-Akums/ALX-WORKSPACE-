@@ -62,7 +62,7 @@
 
 import { MapPin } from "lucide-react";
 import "./components.css"; 
-import "./HubSelector.css";  
+import "./HubSelector.css"; 
 
 export const HUBS = [
   { id: "costain", name: "Costain Hub", location: "Costain", totalSeats: 100 },
@@ -70,8 +70,12 @@ export const HUBS = [
   { id: "ajah", name: "Ajah Hub", location: "Ajah", totalSeats: 50 },
 ];
 
-// --- UPDATED: Accept availabilityByHub prop ---
-export default function HubSelector({ selectedHub, onSelectHub, availabilityByHub = {} }) {
+export default function HubSelector({ 
+  selectedHub, 
+  onSelectHub, 
+  availabilityByHub = {}, 
+  myBookings = [] // --- NEW PROP ---
+}) {
   
   const classNames = (...classes) => {
     return classes.filter(Boolean).join(' ');
@@ -86,9 +90,11 @@ export default function HubSelector({ selectedHub, onSelectHub, availabilityByHu
       
       <div className="hub-selector-grid">
         {HUBS.map((hub) => {
-          // --- NEW: Calculate available seats ---
           const bookedCount = availabilityByHub[hub.id] || 0;
           const available = hub.totalSeats - bookedCount;
+          
+          // --- NEW: Check if this hub has one of *my* bookings ---
+          const hasMyBooking = myBookings.some(b => b.hubId === hub.id);
           // --- END NEW ---
           
           return (
@@ -99,9 +105,10 @@ export default function HubSelector({ selectedHub, onSelectHub, availabilityByHu
                 "hover-elevate",
                 "active-elevate-2",
                 selectedHub === hub.id && "is-selected",
-                available <= 0 && "is-disabled" // Add disabled state
+                available <= 0 && !hasMyBooking && "is-disabled",
+                hasMyBooking && "is-my-booking" // --- NEW CLASS ---
               )}
-              onClick={() => available > 0 && onSelectHub(hub.id)} // Prevent click if full
+              onClick={() => available > 0 && onSelectHub(hub.id)} 
               data-testid={`card-hub-${hub.id}`}
             >
               <div className="card-content hub-card-content">
@@ -117,14 +124,16 @@ export default function HubSelector({ selectedHub, onSelectHub, availabilityByHu
                   </div>
                 </div>
                 <div className="hub-card-footer">
-                  {/* --- UPDATED: Show dynamic availability --- */}
                   <p className={classNames(
                     "hub-card-seats",
-                    available <= 0 && "text-destructive"
+                    available <= 0 && "text-destructive",
+                    hasMyBooking && "text-accent" // --- NEW: Show accent color ---
                   )}>
-                    {available} seats available
+                    {hasMyBooking 
+                      ? "Booked" 
+                      : `${available} seats available`
+                    }
                   </p>
-                  {/* --- END UPDATE --- */}
                 </div>
               </div>
             </div>

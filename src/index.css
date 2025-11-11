@@ -31,7 +31,7 @@
   --secondary-foreground: 0 0% 9%;
   --muted: 0 0% 92%;
   --muted-foreground: 0 0% 45%;
-  --accent: 163 95% 49%;
+  --accent: 260 56% 50%;
   --accent-foreground: 0 0% 9%;
   --destructive: 0 100% 63%;
   --destructive-foreground: 0 0% 98%;
@@ -51,7 +51,11 @@
 
 /* Add your dark mode variables here if you want */
 .dark {
-  /* ... (copy from original index.css) ... */
+  --primary: 203 100% 25%;
+  --primary-foreground: 0 0% 98%;
+  
+  --accent: 260 56% 65%; /* Slightly brighter purple for dark mode contrast */
+  --accent-foreground: 0 0% 9%;
 }
 
 /* --- Base Styles --- */

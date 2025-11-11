@@ -193,20 +193,29 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
   const currentHub = HUBS.find(h => h.id === selectedHub);
   const totalSeats = currentHub?.totalSeats || 50;
   
-  // --- Filter for "Booked" status ---
-  const validBookings = useMemo(() => {
-    return allBookings.filter(b => b.bookingStatus === "Booked");
-  }, [allBookings]);
+  // --- NEW: Find all bookings for the *current user* ---
+  const myBookings = useMemo(() => {
+    return allBookings.filter(
+      b => b.email.toLowerCase() === email.toLowerCase() && b.bookingStatus === "Booked"
+    );
+  }, [allBookings, email]);
+  
+  // Filter for all *other* people's bookings
+  const otherBookings = useMemo(() => {
+    return allBookings.filter(
+      b => b.email.toLowerCase() !== email.toLowerCase() && b.bookingStatus === "Booked"
+    );
+  }, [allBookings, email]);
+  // --- END NEW ---
 
-
-  // --- Use `validBookings` ---
+  // Counts bookings for the HubSelector (now uses `otherBookings`)
   const availabilityDataByHub = useMemo(() => {
     const availability = {};
     HUBS.forEach(hub => {
       availability[hub.id] = 0; 
     });
     
-    const upcomingBookings = validBookings.filter(b => 
+    const upcomingBookings = otherBookings.filter(b => 
       fiveDayList.includes(b.bookingDate)
     );
 
@@ -216,17 +225,16 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
       }
     });
     return availability;
-  }, [validBookings, HUBS, fiveDayList]);
+  }, [otherBookings, HUBS, fiveDayList]);
 
-
-  // --- Use `validBookings` ---
+  // Counts bookings for the DaySelector (now uses `otherBookings`)
   const dayAvailabilityForSelectedHub = useMemo(() => {
     const dailyCounts = {};
     fiveDayList.forEach(date => {
       dailyCounts[date] = 0;
     });
 
-    const hubBookings = validBookings.filter(b => b.hubId === selectedHub);
+    const hubBookings = otherBookings.filter(b => b.hubId === selectedHub);
     
     hubBookings.forEach(booking => {
       if (dailyCounts[booking.bookingDate] !== undefined) {
@@ -234,18 +242,25 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
       }
     });
     return dailyCounts;
-  }, [validBookings, selectedHub, fiveDayList]);
+  }, [otherBookings, selectedHub, fiveDayList]);
 
-  // --- THIS IS THE FIX ---
-  // --- Use `validBookings` ---
-  const currentBookedSeats = useMemo(() => {
-    return validBookings
+  // Finds *other* people's booked seats for the current grid
+  const otherBookedSeats = useMemo(() => {
+    return otherBookings
       .filter(
         b => b.hubId === selectedHub && b.bookingDate === selectedDate
       )
       .map(b => b.seatNumber);
-  }, [validBookings, selectedHub, selectedDate]); // <-- The typo "validBookSings" is now "validBookings"
-  // --- END FIX ---
+  }, [otherBookings, selectedHub, selectedDate]);
+  
+  // --- NEW: Find *my* booked seat for the current grid ---
+  const myBookedSeatForThisGrid = useMemo(() => {
+    const myBooking = myBookings.find(
+      b => b.hubId === selectedHub && b.bookingDate === selectedDate
+    );
+    return myBooking ? myBooking.seatNumber : null;
+  }, [myBookings, selectedHub, selectedDate]);
+  // --- END NEW ---
 
   const handleHubChange = (hubId) => {
     setSelectedHub(hubId);
@@ -283,6 +298,7 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
           selectedHub={selectedHub}
           onSelectHub={handleHubChange}
           availabilityByHub={availabilityDataByHub} 
+          myBookings={myBookings} // --- NEW PROP ---
         />
 
         <DaySelector
@@ -290,19 +306,21 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
           onSelectDate={handleDateChange}
           dayList={fiveDayList}
           availabilityForSelectedHub={dayAvailabilityForSelectedHub}
+          myBookings={myBookings} // --- NEW PROP ---
         />
 
         <SeatGrid
           totalSeats={totalSeats}
           selectedSeat={selectedSeat}
           onSelectSeat={setSelectedSeat}
-          bookedSeats={currentBookedSeats}
+          bookedSeats={otherBookedSeats} // --- RENAMED PROP ---
+          myBookedSeat={myBookedSeatForThisGrid} // --- NEW PROP ---
         />
 
         <div className="booking-page-footer">
           <button
             onClick={handleSubmit}
-            disabled={!selectedSeat || isSubmitting}
+            disabled={!selectedSeat || isSubmitting || !!myBookedSeatForThisGrid} // Disable if user already has a booking
             className="button button-primary button-lg"
             data-testid="button-confirm-booking"
           >
@@ -311,6 +329,8 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
                 <span className="spinner"><Loader2 /></span>
                 Confirming...
               </>
+            ) : myBookedSeatForThisGrid ? (
+                "You have a booking for this day" // Change button text
             ) : (
               "Confirm Booking"
             )}

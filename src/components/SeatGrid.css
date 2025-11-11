@@ -140,3 +140,70 @@
   background-color: hsl(var(--muted));
   border-color: hsl(var(--muted));
 }
+
+/* ... all your existing legend-item, legend-label, legend-box styles ... */
+
+.legend-available {
+  background-color: hsl(var(--background));
+  border-color: hsl(var(--border));
+}
+
+/* --- ADD THIS NEW LEGEND STYLE --- */
+.legend-my-seat {
+  background-color: hsla(var(--accent), 0.2);
+  border-color: hsl(var(--accent));
+}
+/* --- END ADDITION --- */
+
+.legend-selected {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+.legend-booked {
+  background-color: hsl(var(--muted));
+  border-color: hsl(var(--muted));
+  opacity: 0.5;
+}
+
+/* ... all your existing seat-grid, seat-button, seat-icon styles ... */
+
+
+/* --- Seat States --- */
+.seat-button.is-available {
+  background-color: hsl(var(--background));
+  border-color: hsl(var(--border));
+  cursor: pointer;
+}
+
+.seat-button.is-selected {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.seat-button.is-selected-icon {
+  opacity: 0.3;
+}
+
+.seat-button.is-booked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: hsl(var(--muted));
+  border-color: hsl(var(--muted));
+}
+
+/* --- ADD THIS NEW SEAT STYLE --- */
+.seat-button.is-my-seat {
+  background-color: hsla(var(--accent), 0.2);
+  border-color: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.seat-button.is-my-seat .seat-icon {
+  opacity: 0.7;
+  color: hsl(var(--accent));
+}
+/* --- END ADDITION --- */

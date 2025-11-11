@@ -103,3 +103,36 @@
   opacity: 0.9;
 }
 
+/* ... all your existing styles ... */
+
+.day-card-availability.text-destructive-light {
+  color: hsl(var(--destructive));
+  font-weight: 500;
+}
+
+.day-card.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: hsl(var(--muted));
+}
+
+.day-card.is-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* --- ADD THESE NEW STYLES --- */
+.day-card-availability.text-accent {
+  color: hsl(var(--accent));
+  font-weight: 600;
+}
+
+.day-card.is-my-booking {
+  background-color: hsla(var(--accent), 0.08);
+  border-color: hsl(var(--accent));
+}
+
+.day-card.is-my-booking.is-selected {
+  outline-color: hsl(var(--accent));
+}
+/* --- END ADDITION --- */

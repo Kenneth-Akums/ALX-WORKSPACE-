@@ -105,3 +105,36 @@
   transform: none;
   box-shadow: none;
 }
+
+/* ... all your existing styles ... */
+
+.hub-card-seats.text-destructive {
+  color: hsl(var(--destructive));
+}
+
+.hub-card.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: hsl(var(--muted));
+}
+
+.hub-card.is-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* --- ADD THESE NEW STYLES --- */
+.hub-card-seats.text-accent {
+  color: hsl(var(--accent));
+  font-weight: 600;
+}
+
+.hub-card.is-my-booking {
+  background-color: hsla(var(--accent), 0.08);
+  border-color: hsl(var(--accent));
+}
+
+.hub-card.is-my-booking.is-selected {
+  outline-color: hsl(var(--accent));
+}
+/* --- END ADDITION --- */
