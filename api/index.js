@@ -105,7 +105,7 @@
 //   }
 //   try {
 //     const sheets = await getSheetsClient();
-//     const range = "Bookings!A:E"; // Get all data
+//     const range = "Bookings!A:J"; // Get all data
 //     const response = await sheets.spreadsheets.values.get({
 //       spreadsheetId: BOOKINGS_SHEET_ID,
 //       range: range,
@@ -118,11 +118,13 @@
 
 //     // Skip the header row (row[0]) and map the rest
 //     return values.slice(1).map(row => ({
-//       email: row[0] || '',
-//       hubId: row[1] || '',
-//       seatNumber: Number(row[2] || 0), // Ensure this is a number
-//       bookingDate: row[3] || '',
-//       timestamp: row[4] || ''
+//       email: row[0] || '',       // Column A
+//       hubId: row[4] || '',       // Column E
+//       seatNumber: Number(row[5] || 0), // Column F
+//       bookingDate: row[6] || '', // Column G
+//       timestamp: row[7] || '',   // Column H
+//       bookingStatus: row[8] || 'Booked', // Column I
+//       bookingNotification: row[9] || 'NO' // Column J
 //     }));
 //   } catch (err) {
 //     console.error("Error fetching all bookings:", err);
@@ -260,7 +262,7 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://alx-workspace-cyan.vercel.app"
+  "https://alx-workspace-cyan.vercel.app" // Your Vercel URL
 ];
 app.use(cors({ 
   origin: function (origin, callback) {
@@ -304,6 +306,7 @@ async function getSheetsClient() {
     throw new Error("Server auth configuration error.");
   }
   
+  // Parse the private key correctly, handling newlines
   const privateKey = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
   
   const auth = new google.auth.JWT({
@@ -312,7 +315,7 @@ async function getSheetsClient() {
     scopes: SCOPES
   });
 
-  await auth.authorize();
+  await auth.authorize(); // Authorize the client
   return google.sheets({ version: "v4", auth });
 }
 
@@ -342,8 +345,8 @@ export async function isEmailApproved(email) {
 }
 
 /**
- * --- UPDATED: Reads BookingStatus from Column I ---
- * Fetches all bookings from the "Bookings" sheet.
+ * --- CORRECTED ---
+ * Fetches all bookings from the "Bookings" sheet, including new columns.
  */
 export async function getAllBookings() {
   if (!BOOKINGS_SHEET_ID) {
@@ -352,27 +355,26 @@ export async function getAllBookings() {
   }
   try {
     const sheets = await getSheetsClient();
-    // --- UPDATED: Read from A to I ---
-    const range = "Bookings!A:I"; 
+    const range = "Bookings!A:J"; // Get all data up to Column J
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: BOOKINGS_SHEET_ID,
       range: range,
     });
     const values = response.data.values;
     
-    if (!values || values.length <= 1) { 
-      return []; 
+    if (!values || values.length <= 1) { // <= 1 to account for header row
+      return []; // No bookings found
     }
 
-    // --- UPDATED: Use new column indexes ---
+    // Skip the header row (row[0]) and map the rest
     return values.slice(1).map(row => ({
       email: row[0] || '',       // Column A
-      // B, C, D are skipped
       hubId: row[4] || '',       // Column E
       seatNumber: Number(row[5] || 0), // Column F
       bookingDate: row[6] || '', // Column G
       timestamp: row[7] || '',   // Column H
-      bookingStatus: row[8] || 'Booked' // Column I (Default to 'Booked')
+      bookingStatus: row[8] || 'Booked', // Column I
+      bookingNotification: row[9] || 'NO' // Column J
     }));
   } catch (err) {
     console.error("Error fetching all bookings:", err);
@@ -381,8 +383,8 @@ export async function getAllBookings() {
 }
 
 /**
- * --- UPDATED: Writes "Booked" to Column I ---
- * Appends a new booking row to the Google Sheet.
+ * --- CORRECTED ---
+ * Appends a new booking row, preserving formulas and setting defaults.
  */
 export async function appendBooking(data) {
   if (!BOOKINGS_SHEET_ID) {
@@ -393,23 +395,23 @@ export async function appendBooking(data) {
     const sheets = await getSheetsClient();
     const timestamp = new Date().toISOString();
     
-    // --- UPDATED: Add "Booked" for Column I ---
+    // Writes `null` to B, C, D to preserve your formulas
     const values = [[ 
       data.email,      // A: Email
-      null,                // B: Name (empty)
-      null,                // C: Program (empty)
-      null,                // D: Phone (empty)
+      null,              // B: Name (preserves formula)
+      null,              // C: Program (preserves formula)
+      null,              // D: Phone (preserves formula)
       data.hubId,      // E: Hub
       data.seatNumber, // F: SeatNumber
       data.bookingDate,  // G: BookingDate
       timestamp,         // H: Timestamp
-      "Booked"           // I: BookingStatus
+      "Booked",          // I: BookingStatus
+      "NO"               // J: BookingNotification
     ]];
     
     await sheets.spreadsheets.values.append({
       spreadsheetId: BOOKINGS_SHEET_ID,
-      // --- UPDATED: Write to range A to I ---
-      range: "Bookings!A:I",
+      range: "Bookings!A:J", // Write to all 10 columns
       valueInputOption: "USER_ENTERED",
       requestBody: { values: values },
     });
@@ -453,8 +455,9 @@ app.post("/api/verify-email", async (req, res, next) => {
 });
 
 /**
- * --- UPDATED: Conflict check now uses bookingStatus ---
+ * --- CORRECTED ---
  * POST /api/book-seat
+ * Now includes BOTH conflict checks.
  */
 app.post("/api/book-seat", async (req, res, next) => {
   try {
@@ -468,19 +471,31 @@ app.post("/api/book-seat", async (req, res, next) => {
     console.log("Checking for conflicts...");
     const allBookings = await getAllBookings();
 
-    // --- UPDATED: Conflict check now respects "BookingStatus" ---
-    const isConflict = allBookings.find(
+    // CHECK 1: Is this specific seat already "Booked"?
+    const seatConflict = allBookings.find(
       b =>
         b.hubId === hubId &&
         b.bookingDate === bookingDate &&
         b.seatNumber === seatNum &&
         b.bookingStatus === "Booked" // Only a conflict if it's "Booked"
     );
-    // --- END UPDATE ---
 
-    if (isConflict) {
+    if (seatConflict) {
       console.log("Conflict found! Seat already taken.");
       return res.status(409).json({ message: "This seat has just been taken. Please select another." });
+    }
+    
+    // CHECK 2: Has this *user* already "Booked" a seat on this *day*?
+    const userConflict = allBookings.find(
+      b =>
+        b.email.toLowerCase() === email.toLowerCase() &&
+        b.bookingDate === bookingDate &&
+        b.bookingStatus === "Booked"
+    );
+
+    if (userConflict) {
+      console.log("Conflict found! User already has a booking for this day.");
+      return res.status(409).json({ message: "You already have a booking for this day. You can only book one seat per day." });
     }
     
     console.log("No conflict. Appending booking...");
