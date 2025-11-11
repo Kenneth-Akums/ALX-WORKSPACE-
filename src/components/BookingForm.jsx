@@ -8,8 +8,7 @@
 // import "./components.css";
 // import "./BookingForm.css";
 
-// // --- NEW HELPER FUNCTION ---
-// // Generates the 5 valid booking days (skipping Sunday)
+// // Helper function
 // const getNextFiveWorkDays = () => {
 //   const days = [];
 //   let currentOffset = 0;
@@ -22,51 +21,59 @@
 //   }
 //   return days;
 // };
-// // --- END HELPER ---
 
 // export default function BookingForm({ email, onBookingComplete, allBookings = [] }) {
 //   const [selectedHub, setSelectedHub] = useState("costain");
 //   const [selectedSeat, setSelectedSeat] = useState(null);
   
-//   // --- UPDATED: Get days and set default date ---
 //   const fiveDayList = useMemo(() => getNextFiveWorkDays(), []);
 //   const [selectedDate, setSelectedDate] = useState(fiveDayList[0]);
-//   // --- END UPDATE ---
   
 //   const [isSubmitting, setIsSubmitting] = useState(false);
 
 //   const currentHub = HUBS.find(h => h.id === selectedHub);
 //   const totalSeats = currentHub?.totalSeats || 50;
 
-//   // --- NEW: Calculate availability from allBookings prop ---
-//   const availabilityData = useMemo(() => {
-//     const availability = {
-//       byDate: {},
-//       byHub: {},
-//     };
-
-//     // Initialize counts
-//     fiveDayList.forEach(date => {
-//       availability.byDate[date] = 0; // Start with 0 booked
-//     });
+//   // --- THIS IS FIX #1 ---
+//   // This calculation now ONLY counts bookings in the next 5 days
+//   // This fixes the "99 seats" bug.
+//   const availabilityDataByHub = useMemo(() => {
+//     const availability = {};
 //     HUBS.forEach(hub => {
-//       availability.byHub[hub.id] = 0; // Start with 0 booked
+//       availability[hub.id] = 0; // Start with 0 booked
 //     });
 
-//     // Count bookings
-//     allBookings.forEach(booking => {
-//       if (availability.byDate[booking.bookingDate] !== undefined) {
-//         availability.byDate[booking.bookingDate]++;
-//       }
-//       if (availability.byHub[booking.hubId] !== undefined) {
-//         availability.byHub[booking.hubId]++;
+//     // --- NEW: Only count bookings that are in the upcoming 5 days ---
+//     const upcomingBookings = allBookings.filter(b => fiveDayList.includes(b.bookingDate));
+//     // --- END NEW ---
+
+//     // Now, we count from the *filtered* list
+//     upcomingBookings.forEach(booking => {
+//       if (availability[booking.hubId] !== undefined) {
+//         availability[booking.hubId]++;
 //       }
 //     });
-
 //     return availability;
-//   }, [allBookings, fiveDayList, HUBS]);
+//   }, [allBookings, HUBS, fiveDayList]); // Added fiveDayList to dependencies
+//   // --- END FIX #1 ---
 
-//   // --- NEW: Calculate booked seats for the *current* grid ---
+
+//   // This calculation is correct - it filters by the selected hub
+//   const dayAvailabilityForSelectedHub = useMemo(() => {
+//     const dailyCounts = {};
+//     fiveDayList.forEach(date => {
+//       dailyCounts[date] = 0;
+//     });
+//     const hubBookings = allBookings.filter(b => b.hubId === selectedHub);
+//     hubBookings.forEach(booking => {
+//       if (dailyCounts[booking.bookingDate] !== undefined) {
+//         dailyCounts[booking.bookingDate]++;
+//       }
+//     });
+//     return dailyCounts;
+//   }, [allBookings, selectedHub, fiveDayList]);
+
+//   // This calculation is also correct
 //   const currentBookedSeats = useMemo(() => {
 //     return allBookings
 //       .filter(
@@ -74,9 +81,7 @@
 //       )
 //       .map(b => b.seatNumber);
 //   }, [allBookings, selectedHub, selectedDate]);
-//   // --- END NEW ---
 
-//   // Reset seat selection when hub or date changes
 //   const handleHubChange = (hubId) => {
 //     setSelectedHub(hubId);
 //     setSelectedSeat(null);
@@ -90,10 +95,7 @@
 //   const handleSubmit = async () => {
 //     if (!selectedSeat) return;
 //     setIsSubmitting(true);
-    
-//     // We no longer simulate here. We just call the function from props.
 //     await onBookingComplete(selectedSeat, selectedDate, selectedHub);
-    
 //     setIsSubmitting(false);
 //   };
 
@@ -115,27 +117,22 @@
 //         <HubSelector
 //           selectedHub={selectedHub}
 //           onSelectHub={handleHubChange}
-//           // --- NEW PROP ---
-//           availabilityByHub={availabilityData.byHub}
-//           // --- END NEW PROP ---
+//           availabilityByHub={availabilityDataByHub} // This prop now has the correct data
 //         />
 
 //         <DaySelector
 //           selectedDate={selectedDate}
 //           onSelectDate={handleDateChange}
-//           // --- NEW PROP ---
-//           availabilityByDate={availabilityData.byDate} // Pass byDate object
 //           dayList={fiveDayList}
-//           // --- END NEW PROP ---
+//           availabilityForSelectedHub={dayAvailabilityForSelectedHub}
+//           // totalSeatsForHub prop is removed as it's not needed
 //         />
 
 //         <SeatGrid
 //           totalSeats={totalSeats}
 //           selectedSeat={selectedSeat}
 //           onSelectSeat={setSelectedSeat}
-//           // --- UPDATED PROP ---
 //           bookedSeats={currentBookedSeats}
-//           // --- END UPDATED PROP ---
 //         />
 
 //         <div className="booking-page-footer">
@@ -195,54 +192,60 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
 
   const currentHub = HUBS.find(h => h.id === selectedHub);
   const totalSeats = currentHub?.totalSeats || 50;
+  
+  // --- Filter for "Booked" status ---
+  const validBookings = useMemo(() => {
+    return allBookings.filter(b => b.bookingStatus === "Booked");
+  }, [allBookings]);
 
-  // --- THIS IS FIX #1 ---
-  // This calculation now ONLY counts bookings in the next 5 days
-  // This fixes the "99 seats" bug.
+
+  // --- Use `validBookings` ---
   const availabilityDataByHub = useMemo(() => {
     const availability = {};
     HUBS.forEach(hub => {
-      availability[hub.id] = 0; // Start with 0 booked
+      availability[hub.id] = 0; 
     });
+    
+    const upcomingBookings = validBookings.filter(b => 
+      fiveDayList.includes(b.bookingDate)
+    );
 
-    // --- NEW: Only count bookings that are in the upcoming 5 days ---
-    const upcomingBookings = allBookings.filter(b => fiveDayList.includes(b.bookingDate));
-    // --- END NEW ---
-
-    // Now, we count from the *filtered* list
     upcomingBookings.forEach(booking => {
       if (availability[booking.hubId] !== undefined) {
         availability[booking.hubId]++;
       }
     });
     return availability;
-  }, [allBookings, HUBS, fiveDayList]); // Added fiveDayList to dependencies
-  // --- END FIX #1 ---
+  }, [validBookings, HUBS, fiveDayList]);
 
 
-  // This calculation is correct - it filters by the selected hub
+  // --- Use `validBookings` ---
   const dayAvailabilityForSelectedHub = useMemo(() => {
     const dailyCounts = {};
     fiveDayList.forEach(date => {
       dailyCounts[date] = 0;
     });
-    const hubBookings = allBookings.filter(b => b.hubId === selectedHub);
+
+    const hubBookings = validBookings.filter(b => b.hubId === selectedHub);
+    
     hubBookings.forEach(booking => {
       if (dailyCounts[booking.bookingDate] !== undefined) {
         dailyCounts[booking.bookingDate]++;
       }
     });
     return dailyCounts;
-  }, [allBookings, selectedHub, fiveDayList]);
+  }, [validBookings, selectedHub, fiveDayList]);
 
-  // This calculation is also correct
+  // --- THIS IS THE FIX ---
+  // --- Use `validBookings` ---
   const currentBookedSeats = useMemo(() => {
-    return allBookings
+    return validBookings
       .filter(
         b => b.hubId === selectedHub && b.bookingDate === selectedDate
       )
       .map(b => b.seatNumber);
-  }, [allBookings, selectedHub, selectedDate]);
+  }, [validBookings, selectedHub, selectedDate]); // <-- The typo "validBookSings" is now "validBookings"
+  // --- END FIX ---
 
   const handleHubChange = (hubId) => {
     setSelectedHub(hubId);
@@ -279,7 +282,7 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
         <HubSelector
           selectedHub={selectedHub}
           onSelectHub={handleHubChange}
-          availabilityByHub={availabilityDataByHub} // This prop now has the correct data
+          availabilityByHub={availabilityDataByHub} 
         />
 
         <DaySelector
@@ -287,7 +290,6 @@ export default function BookingForm({ email, onBookingComplete, allBookings = []
           onSelectDate={handleDateChange}
           dayList={fiveDayList}
           availabilityForSelectedHub={dayAvailabilityForSelectedHub}
-          // totalSeatsForHub prop is removed as it's not needed
         />
 
         <SeatGrid

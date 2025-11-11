@@ -2,11 +2,16 @@
 // import cors from "cors";
 // import "dotenv/config";
 // import { google } from "googleapis";
+// import path from "path";
+// import { fileURLToPath } from "url";
 
+// // --- START: express setup ---
 // const app = express();
+
+// // Allow both your local dev server AND your deployed Vercel app
 // const allowedOrigins = [
 //   "http://localhost:5173",
-//   "https://alx-workspace-cyan.vercel.app"
+//   "https://alx-workspace-cyan.vercel.app" // Your Vercel URL
 // ];
 // app.use(cors({ 
 //   origin: function (origin, callback) {
@@ -18,23 +23,26 @@
 //   }, 
 //   credentials: true 
 // }));
+
 // app.use(express.json());
 // app.use(express.urlencoded({ extended: false }));
+// // --- END: express setup ---
+
 
 // // --- START: googleSheets.js logic ---
 
-// // --- NEW AUTHENTICATION METHOD ---
-// // Read keys directly from Vercel's environment variables
-// const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
-// const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
-// // --- END NEW AUTHENTICATION METHOD ---
-
+// // Auth variables
 // const BOOKINGS_SHEET_ID = process.env.BOOKINGS_SHEET_ID;
 // const LEARNERS_SHEET_ID = process.env.LEARNERS_SHEET_ID;
+// const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
+// const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
 // const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
+// /**
+//  * Authenticates and returns a Google Sheets API client
+//  */
 // async function getSheetsClient() {
-//   // --- NEW DEBUG LOGGING ---
+//   // --- NEW: Debug logging ---
 //   console.log("Checking for Google auth variables...");
 //   if (!GOOGLE_CLIENT_EMAIL) {
 //     console.error("GOOGLE_CLIENT_EMAIL is NOT SET.");
@@ -42,13 +50,13 @@
 //   if (!GOOGLE_PRIVATE_KEY) {
 //     console.error("GOOGLE_PRIVATE_KEY is NOT SET.");
 //   }
-//   // --- END DEBUG LOGGING ---
+//   // --- END DEBUG ---
 
 //   if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY) {
 //     console.error("Missing Google auth environment variables");
 //     throw new Error("Server auth configuration error.");
 //   }
-
+  
 //   // Parse the private key correctly, handling newlines
 //   const privateKey = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
   
@@ -62,7 +70,10 @@
 //   return google.sheets({ version: "v4", auth });
 // }
 
-// async function isEmailApproved(email) {
+// /**
+//  * Checks if an email exists in the 'ApprovedLearners' sheet.
+//  */
+// export async function isEmailApproved(email) {
 //   if (!LEARNERS_SHEET_ID) {
 //     console.error("LEARNERS_SHEET_ID is not set.");
 //     throw new Error("Learner Sheet configuration is missing.");
@@ -84,7 +95,45 @@
 //   }
 // }
 
-// async function appendBooking(data) {
+// /**
+//  * Fetches all bookings from the "Bookings" sheet.
+//  */
+// export async function getAllBookings() {
+//   if (!BOOKINGS_SHEET_ID) {
+//     console.error("BOOKINGS_SHEET_ID is not set.");
+//     throw new Error("Booking Sheet configuration is missing.");
+//   }
+//   try {
+//     const sheets = await getSheetsClient();
+//     const range = "Bookings!A:E"; // Get all data
+//     const response = await sheets.spreadsheets.values.get({
+//       spreadsheetId: BOOKINGS_SHEET_ID,
+//       range: range,
+//     });
+//     const values = response.data.values;
+    
+//     if (!values || values.length <= 1) { // <= 1 to account for header row
+//       return []; // No bookings found
+//     }
+
+//     // Skip the header row (row[0]) and map the rest
+//     return values.slice(1).map(row => ({
+//       email: row[0] || '',
+//       hubId: row[1] || '',
+//       seatNumber: Number(row[2] || 0), // Ensure this is a number
+//       bookingDate: row[3] || '',
+//       timestamp: row[4] || ''
+//     }));
+//   } catch (err) {
+//     console.error("Error fetching all bookings:", err);
+//     throw new Error(err.message || "Failed to fetch bookings.");
+//   }
+// }
+
+// /**
+//  * Appends a new booking row to the Google Sheet.
+//  */
+// export async function appendBooking(data) {
 //   if (!BOOKINGS_SHEET_ID) {
 //     console.error("BOOKINGS_SHEET_ID is not set.");
 //     throw new Error("Booking Sheet configuration is missing.");
@@ -109,30 +158,24 @@
 
 
 // // --- START: routes.js logic ---
-// app.get("/api/bookings", async (req, res, next) => {
+
+// /**
+//  * GET /api/get-bookings
+//  * Fetches all bookings to populate the frontend UI.
+//  */
+// app.get("/api/get-bookings", async (req, res, next) => {
 //   try {
-//     const sheets = await getSheetsClient();
-//     const response = await sheets.spreadsheets.values.get({
-//       spreadsheetId: BOOKINGS_SHEET_ID,
-//       range: "Bookings!A:E",
-//     });
-
-//     const values = response.data.values || [];
-//     // Skip header row if it exists and map to objects
-//     const bookings = values.slice(1).map(row => ({
-//       email: row[0],
-//       hubId: row[1],
-//       seatNumber: row[2],
-//       bookingDate: row[3],
-//       timestamp: row[4]
-//     }));
-
-//     res.json({ bookings });
+//     const bookings = await getAllBookings();
+//     res.json(bookings);
 //   } catch (err) {
 //     next(err);
 //   }
 // });
 
+// /**
+//  * POST /api/verify-email
+//  * Checks if an email is on the approved list.
+//  */
 // app.post("/api/verify-email", async (req, res, next) => {
 //   try {
 //     const { email } = req.body;
@@ -146,14 +189,46 @@
 //   }
 // });
 
+// /**
+//  * POST /api/book-seat
+//  * Creates a new booking *after* checking for conflicts.
+//  */
 // app.post("/api/book-seat", async (req, res, next) => {
 //   try {
 //     const { email, hubId, seatNumber, bookingDate } = req.body;
 //     if (!email || !hubId || !seatNumber || !bookingDate) {
 //       return res.status(400).json({ message: "Missing required booking data." });
 //     }
-//     await appendBooking({ email, hubId, seatNumber, bookingDate });
+
+//     // --- THIS IS THE FIX ---
+//     // 1. Convert incoming seat to a number
+//     const seatNum = Number(seatNumber);
+
+//     // 2. Re-fetch all bookings NOW to get the latest data
+//     console.log("Checking for conflicts...");
+//     const allBookings = await getAllBookings();
+
+//     // 3. Check for conflict
+//     const isConflict = allBookings.find(
+//       b =>
+//         b.hubId === hubId &&
+//         b.bookingDate === bookingDate &&
+//         b.seatNumber === seatNum // Strict number-to-number check
+//     );
+
+//     if (isConflict) {
+//       console.log("Conflict found! Seat already taken.");
+//       // 409 Conflict: The request could not be completed due to a conflict
+//       return res.status(409).json({ message: "This seat has just been taken. Please select another." });
+//     }
+//     // --- END FIX ---
+
+//     // 4. If no conflict, append the new booking
+//     console.log("No conflict. Appending booking...");
+//     await appendBooking({ email, hubId, seatNumber: seatNum, bookingDate });
+    
 //     res.status(201).json({ success: true, data: req.body });
+
 //   } catch (err) {
 //     next(err);
 //   }
@@ -183,10 +258,9 @@ import { fileURLToPath } from "url";
 // --- START: express setup ---
 const app = express();
 
-// Allow both your local dev server AND your deployed Vercel app
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://alx-workspace-cyan.vercel.app" // Your Vercel URL
+  "https://alx-workspace-cyan.vercel.app"
 ];
 app.use(cors({ 
   origin: function (origin, callback) {
@@ -217,7 +291,6 @@ const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
  * Authenticates and returns a Google Sheets API client
  */
 async function getSheetsClient() {
-  // --- NEW: Debug logging ---
   console.log("Checking for Google auth variables...");
   if (!GOOGLE_CLIENT_EMAIL) {
     console.error("GOOGLE_CLIENT_EMAIL is NOT SET.");
@@ -225,14 +298,12 @@ async function getSheetsClient() {
   if (!GOOGLE_PRIVATE_KEY) {
     console.error("GOOGLE_PRIVATE_KEY is NOT SET.");
   }
-  // --- END DEBUG ---
 
   if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY) {
     console.error("Missing Google auth environment variables");
     throw new Error("Server auth configuration error.");
   }
   
-  // Parse the private key correctly, handling newlines
   const privateKey = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
   
   const auth = new google.auth.JWT({
@@ -241,7 +312,7 @@ async function getSheetsClient() {
     scopes: SCOPES
   });
 
-  await auth.authorize(); // Authorize the client
+  await auth.authorize();
   return google.sheets({ version: "v4", auth });
 }
 
@@ -271,6 +342,7 @@ export async function isEmailApproved(email) {
 }
 
 /**
+ * --- UPDATED: Reads BookingStatus from Column I ---
  * Fetches all bookings from the "Bookings" sheet.
  */
 export async function getAllBookings() {
@@ -280,24 +352,27 @@ export async function getAllBookings() {
   }
   try {
     const sheets = await getSheetsClient();
-    const range = "Bookings!A:E"; // Get all data
+    // --- UPDATED: Read from A to I ---
+    const range = "Bookings!A:I"; 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: BOOKINGS_SHEET_ID,
       range: range,
     });
     const values = response.data.values;
     
-    if (!values || values.length <= 1) { // <= 1 to account for header row
-      return []; // No bookings found
+    if (!values || values.length <= 1) { 
+      return []; 
     }
 
-    // Skip the header row (row[0]) and map the rest
+    // --- UPDATED: Use new column indexes ---
     return values.slice(1).map(row => ({
-      email: row[0] || '',
-      hubId: row[1] || '',
-      seatNumber: Number(row[2] || 0), // Ensure this is a number
-      bookingDate: row[3] || '',
-      timestamp: row[4] || ''
+      email: row[0] || '',       // Column A
+      // B, C, D are skipped
+      hubId: row[4] || '',       // Column E
+      seatNumber: Number(row[5] || 0), // Column F
+      bookingDate: row[6] || '', // Column G
+      timestamp: row[7] || '',   // Column H
+      bookingStatus: row[8] || 'Booked' // Column I (Default to 'Booked')
     }));
   } catch (err) {
     console.error("Error fetching all bookings:", err);
@@ -306,6 +381,7 @@ export async function getAllBookings() {
 }
 
 /**
+ * --- UPDATED: Writes "Booked" to Column I ---
  * Appends a new booking row to the Google Sheet.
  */
 export async function appendBooking(data) {
@@ -316,10 +392,24 @@ export async function appendBooking(data) {
   try {
     const sheets = await getSheetsClient();
     const timestamp = new Date().toISOString();
-    const values = [[ data.email, data.hubId, data.seatNumber, data.bookingDate, timestamp ]];
+    
+    // --- UPDATED: Add "Booked" for Column I ---
+    const values = [[ 
+      data.email,      // A: Email
+      null,                // B: Name (empty)
+      null,                // C: Program (empty)
+      null,                // D: Phone (empty)
+      data.hubId,      // E: Hub
+      data.seatNumber, // F: SeatNumber
+      data.bookingDate,  // G: BookingDate
+      timestamp,         // H: Timestamp
+      "Booked"           // I: BookingStatus
+    ]];
+    
     await sheets.spreadsheets.values.append({
       spreadsheetId: BOOKINGS_SHEET_ID,
-      range: "Bookings!A:E",
+      // --- UPDATED: Write to range A to I ---
+      range: "Bookings!A:I",
       valueInputOption: "USER_ENTERED",
       requestBody: { values: values },
     });
@@ -336,7 +426,6 @@ export async function appendBooking(data) {
 
 /**
  * GET /api/get-bookings
- * Fetches all bookings to populate the frontend UI.
  */
 app.get("/api/get-bookings", async (req, res, next) => {
   try {
@@ -349,7 +438,6 @@ app.get("/api/get-bookings", async (req, res, next) => {
 
 /**
  * POST /api/verify-email
- * Checks if an email is on the approved list.
  */
 app.post("/api/verify-email", async (req, res, next) => {
   try {
@@ -365,8 +453,8 @@ app.post("/api/verify-email", async (req, res, next) => {
 });
 
 /**
+ * --- UPDATED: Conflict check now uses bookingStatus ---
  * POST /api/book-seat
- * Creates a new booking *after* checking for conflicts.
  */
 app.post("/api/book-seat", async (req, res, next) => {
   try {
@@ -375,30 +463,26 @@ app.post("/api/book-seat", async (req, res, next) => {
       return res.status(400).json({ message: "Missing required booking data." });
     }
 
-    // --- THIS IS THE FIX ---
-    // 1. Convert incoming seat to a number
     const seatNum = Number(seatNumber);
 
-    // 2. Re-fetch all bookings NOW to get the latest data
     console.log("Checking for conflicts...");
     const allBookings = await getAllBookings();
 
-    // 3. Check for conflict
+    // --- UPDATED: Conflict check now respects "BookingStatus" ---
     const isConflict = allBookings.find(
       b =>
         b.hubId === hubId &&
         b.bookingDate === bookingDate &&
-        b.seatNumber === seatNum // Strict number-to-number check
+        b.seatNumber === seatNum &&
+        b.bookingStatus === "Booked" // Only a conflict if it's "Booked"
     );
+    // --- END UPDATE ---
 
     if (isConflict) {
       console.log("Conflict found! Seat already taken.");
-      // 409 Conflict: The request could not be completed due to a conflict
       return res.status(409).json({ message: "This seat has just been taken. Please select another." });
     }
-    // --- END FIX ---
-
-    // 4. If no conflict, append the new booking
+    
     console.log("No conflict. Appending booking...");
     await appendBooking({ email, hubId, seatNumber: seatNum, bookingDate });
     
