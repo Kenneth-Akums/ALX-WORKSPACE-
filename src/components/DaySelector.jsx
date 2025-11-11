@@ -94,16 +94,22 @@ export default function DaySelector({
   onSelectDate,
   dayList = [],
   availabilityForSelectedHub = {},
-  myBookings = [] // --- NEW PROP ---
+  myBookings = [],
+  selectedHub // --- NEW PROP ---
 }) {
 
   const days = dayList.map(dateStr => {
     const dateObj = parse(dateStr, "yyyy-MM-dd", new Date());
+    
+    // Total booked seats for this day *at this hub*
     const bookedCount = availabilityForSelectedHub[dateStr] || 0;
     
-    // --- NEW: Check if this day has one of *my* bookings ---
-    const hasMyBooking = myBookings.some(b => b.bookingDate === dateStr);
-    // --- END NEW ---
+    // --- UPDATED LOGIC ---
+    // Check if my booking is for *this day* AND *this hub*
+    const myBookingForThisDay = myBookings.find(
+      b => b.bookingDate === dateStr && b.hubId === selectedHub
+    );
+    // --- END UPDATE ---
 
     return {
       date: dateStr,
@@ -111,7 +117,7 @@ export default function DaySelector({
       dayNumber: format(dateObj, "d"),
       monthName: format(dateObj, "MMM"),
       bookedCount: bookedCount,
-      hasMyBooking: hasMyBooking // --- NEW ---
+      hasMyBooking: !!myBookingForThisDay // Is true only for the correct hub
     };
   });
 
@@ -135,7 +141,7 @@ export default function DaySelector({
               "hover-elevate",
               "active-elevate-2",
               selectedDate === day.date && "is-selected",
-              day.hasMyBooking && "is-my-booking" // --- NEW CLASS ---
+              day.hasMyBooking && "is-my-booking"
             )}
             onClick={() => onSelectDate(day.date)}
             data-testid={`card-day-${day.date}`}
@@ -156,13 +162,13 @@ export default function DaySelector({
               
               <div className={classNames(
                 "day-card-availability",
-                // --- UPDATED: Show my booking first ---
                 day.hasMyBooking && "text-accent",
                 !day.hasMyBooking && day.bookedCount > 0 && "text-destructive-light"
               )}>
                 {day.hasMyBooking 
                   ? "Booked by You" 
-                  : `${day.bookedCount} booked`
+                  // Show the count of *other* people's bookings
+                  : `${day.bookedCount - (day.hasMyBooking ? 1 : 0)} booked`
                 }
               </div>
             </div>

@@ -74,7 +74,8 @@ export default function HubSelector({
   selectedHub, 
   onSelectHub, 
   availabilityByHub = {}, 
-  myBookings = [] // --- NEW PROP ---
+  myBookings = [],
+  selectedDate // --- NEW PROP ---
 }) {
   
   const classNames = (...classes) => {
@@ -90,12 +91,19 @@ export default function HubSelector({
       
       <div className="hub-selector-grid">
         {HUBS.map((hub) => {
-          const bookedCount = availabilityByHub[hub.id] || 0;
-          const available = hub.totalSeats - bookedCount;
+          // Total booked (by everyone) for all 5 days
+          const totalBooked = availabilityByHub[hub.id] || 0;
+          const available = hub.totalSeats - totalBooked;
           
-          // --- NEW: Check if this hub has one of *my* bookings ---
-          const hasMyBooking = myBookings.some(b => b.hubId === hub.id);
-          // --- END NEW ---
+          // --- UPDATED LOGIC ---
+          // Check if I have a booking for *this specific hub* on the *selected day*
+          const myBookingForSelectedDateAndHub = myBookings.find(
+            b => b.hubId === hub.id && b.bookingDate === selectedDate
+          );
+          
+          // Check if I have *any* booking at this hub (for the purple border)
+          const hasMyBookingAtThisHub = myBookings.some(b => b.hubId === hub.id);
+          // --- END UPDATED LOGIC ---
           
           return (
             <div
@@ -105,8 +113,9 @@ export default function HubSelector({
                 "hover-elevate",
                 "active-elevate-2",
                 selectedHub === hub.id && "is-selected",
-                available <= 0 && !hasMyBooking && "is-disabled",
-                hasMyBooking && "is-my-booking" // --- NEW CLASS ---
+                available <= 0 && !hasMyBookingAtThisHub && "is-disabled",
+                // Show purple border if I have *any* booking here
+                hasMyBookingAtThisHub && "is-my-booking" 
               )}
               onClick={() => available > 0 && onSelectHub(hub.id)} 
               data-testid={`card-hub-${hub.id}`}
@@ -124,16 +133,18 @@ export default function HubSelector({
                   </div>
                 </div>
                 <div className="hub-card-footer">
+                  {/* --- UPDATED TEXT AND STYLE LOGIC --- */}
                   <p className={classNames(
                     "hub-card-seats",
                     available <= 0 && "text-destructive",
-                    hasMyBooking && "text-accent" // --- NEW: Show accent color ---
+                    myBookingForSelectedDateAndHub && "text-accent" // Purple if booked *today*
                   )}>
-                    {hasMyBooking 
-                      ? "Booked" 
+                    {myBookingForSelectedDateAndHub
+                      ? "Booked by You" // Text if booked *today*
                       : `${available} seats available`
                     }
                   </p>
+                  {/* --- END UPDATE --- */}
                 </div>
               </div>
             </div>
