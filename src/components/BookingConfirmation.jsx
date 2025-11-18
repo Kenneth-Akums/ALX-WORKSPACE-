@@ -1,31 +1,41 @@
-import { CheckCircle2, Calendar, Armchair, Mail, Clock, MapPin } from "lucide-react";
+import { CheckCircle2, Calendar, Armchair, Mail, Clock, MapPin, Trash2 } from "lucide-react";
 import { format, parse } from "date-fns";
-import { HUBS } from "./HubSelector"; // Import from our converted component
-import "./components.css"; // Shared component styles
-import "./BookingConfirmation.css"; // Component-specific styles
+import { HUBS } from "./HubSelector.jsx"; // Use .jsx
+import "./components.css"; 
+import "./BookingConfirmation.css";
+
+// --- NEW: Helper function to get first name ---
+const getFirstName = (name) => {
+  if (!name) return "";
+  return name.split(" ")[0]; // Get the first part of the name
+};
 
 export default function BookingConfirmation({ 
   email, 
+  userName, 
   seatNumber, 
   bookingDate,
+  bookingTime, // NEW PROP
   hubId,
-  onBookAnother 
+  onBookAnother,
+  onCancelBooking // NEW PROP
 }) {
   const formattedDate = format(parse(bookingDate, "yyyy-MM-dd", new Date()), "EEEE, MMMM d, yyyy");
-  const timestamp = format(new Date(), "h:mm a");
+  const welcomeName = getFirstName(userName) || email;
   const hub = HUBS.find(h => h.id === hubId);
+  
+  
+  
 
   return (
     <div className="confirmation-page">
       <div className="card confirmation-card">
         <div className="card-header confirmation-header">
-          {/* Guidelines: Confirmation icon at top */}
           <div className="confirmation-icon-wrapper">
             <CheckCircle2 className="confirmation-icon" />
           </div>
           <div>
-            {/* Guidelines: Success message: "Your seat is reserved!" */}
-            <h1 className="card-title">Booking Confirmed!</h1>
+            <h1 className="card-title">Booking Confirmed, {welcomeName}!</h1>
             <p className="card-description">
               Your seat is reserved
             </p>
@@ -33,23 +43,13 @@ export default function BookingConfirmation({
         </div>
         
         <div className="card-content confirmation-content">
-          {/* Guidelines: Bordered card with sections */}
           <div className="details-box">
-            
-            <div className="detail-item">
-              <Mail className="detail-icon" />
-              <div className="detail-text">
-                <p className="detail-label">Email</p>
-                {/* Guidelines: Learner email (bold) */}
-                <p className="detail-value" data-testid="text-email">{email}</p>
-              </div>
-            </div>
             
             <div className="detail-item">
               <MapPin className="detail-icon" />
               <div className="detail-text">
                 <p className="detail-label">Hub Location</p>
-                <p className="detail-value" data-testid="text-hub">{hub?.name}</p>
+                <p className="detail-value">{hub?.name}</p>
               </div>
             </div>
             
@@ -57,44 +57,52 @@ export default function BookingConfirmation({
               <Armchair className="detail-icon" />
               <div className="detail-text">
                 <p className="detail-label">Seat Number</p>
-                {/* Guidelines: Selected seat number (large, prominent) */}
-                <p className="detail-value-large" data-testid="text-seat-number">{seatNumber}</p>
+                <p className="detail-value-large">{seatNumber}</p>
               </div>
             </div>
             
             <div className="detail-item">
               <Calendar className="detail-icon" />
               <div className="detail-text">
-                <p className="detail-label">Booking Date</p>
-                {/* Guidelines: Selected day (formatted date) */}
-                <p className="detail-value" data-testid="text-booking-date">{formattedDate}</p>
+                <p className="detail-label">Date</p>
+                <p className="detail-value">{formattedDate}</p>
               </div>
             </div>
             
             <div className="detail-item">
               <Clock className="detail-icon" />
               <div className="detail-text">
-                <p className="detail-label">Booked At</p>
-                {/* Guidelines: Timestamp of booking */}
-                <p className="detail-value">{timestamp}</p>
+                <p className="detail-label">Arrival Time</p>
+                <p className="detail-value">{bookingTime}</p>
               </div>
             </div>
           </div>
 
           <div className="info-box">
-            <p>
-              A confirmation has been sent to your email and recorded in the system.
-            </p>
+            <p>A confirmation has been sent to your email.</p>
           </div>
 
-          {/* Guidelines: Secondary action: "Book Another Seat" button */}
-          <button
-            onClick={onBookAnother}
-            className="button button-outline"
-            data-testid="button-book-another"
-          >
-            Book Another Seat
-          </button>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <button
+              onClick={onBookAnother}
+              className="button button-outline"
+            >
+              Book Another Seat
+            </button>
+            
+            <button
+              onClick={onCancelBooking}
+              className="button"
+              style={{ 
+                backgroundColor: 'hsl(var(--destructive))', 
+                color: 'white',
+                border: '1px solid hsl(var(--destructive))'
+              }}
+            >
+              <Trash2 style={{ width: '1rem', height: '1rem' }} />
+              Cancel Booking
+            </button>
+          </div>
         </div>
       </div>
     </div>

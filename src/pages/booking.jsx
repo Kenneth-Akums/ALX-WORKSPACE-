@@ -161,15 +161,13 @@ import BookingConfirmation from "../components/BookingConfirmation.jsx";
 export default function BookingPage() {
   const [step, setStep] = useState("email"); // "email" | "booking" | "confirmation"
   const [email, setEmail] = useState("");
+  const [userName, setUserName] = useState(""); // --- NEW: Store the user's name ---
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [bookingDetails, setBookingDetails] = useState(null);
   const [allBookings, setAllBookings] = useState([]);
 
-  // This logic moves into the handleVerified function
-  // useEffect(() => { ... }, []);
-
-  const handleVerified = async (verifiedEmail) => {
-    // 1. Fetch all bookings *after* verification
+  const handleVerified = async (verifiedEmail, verificationData) => {
+    // --- UPDATED: Receive name from API response ---
     try {
       console.log("Fetching all bookings...");
       const response = await fetch("/api/get-bookings");
@@ -183,6 +181,7 @@ export default function BookingPage() {
       
       // 2. Now proceed to the booking form
       setEmail(verifiedEmail);
+      setUserName(verificationData.name || ""); // Store the name
       setStep("booking");
 
     } catch (error) {
@@ -197,11 +196,12 @@ export default function BookingPage() {
     console.log("Sending signup email to:", unverifiedEmail);
   };
 
-  const handleBookingComplete = async (seatNumber, date, hubId) => {
+  const handleBookingComplete = async (seatNumber, date, hubId, bookingTime) => {
     const bookingData = {
       email: email,
       seatNumber: seatNumber,
       bookingDate: date,
+      bookingTime: bookingTime, // Pass time
       hubId: hubId,
     };
 
@@ -234,23 +234,17 @@ export default function BookingPage() {
         throw new Error(errorMessage);
       }
       
-      // If successful, update state to show confirmation
-      setBookingDetails({ seatNumber, date, hubId });
+      setBookingDetails({ seatNumber, bookingDate: date, hubId, bookingTime });
       setStep("confirmation");
 
-      // --- THIS IS FIX #1 ---
-      // Add the new booking to our local state *with* the correct status
-      // This ensures the UI is up-to-date for "Book Another"
       setAllBookings(currentBookings => [
         ...currentBookings,
         { 
           ...bookingData, 
           seatNumber: Number(seatNumber),
-          bookingStatus: "Booked" // This was the missing piece
+          bookingStatus: "Booked"
         }
       ]);
-      // --- END FIX #1 ---
-
     } catch (error) {
       console.error("Failed to submit booking:", error);
       alert(error.message); 
@@ -258,20 +252,51 @@ export default function BookingPage() {
   };
 
 
-  // --- THIS IS FIX #2 ---
+const handleCancelBooking = async (dateToCancel) => {
+    if (!window.confirm(`Are you sure you want to cancel this booking ${dateToCancel}?`)) return;
+    
+    try {
+      const response = await fetch("/api/cancel-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email: email, 
+          date: dateToCancel 
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to cancel");
+
+      alert("Booking Cancelled Successfully");
+      
+      // Refresh data
+      const bookingsRes = await fetch("/api/get-bookings");
+      const bookings = await bookingsRes.json();
+      setAllBookings(bookings);
+      
+      if (step === "confirmation") {
+      setBookingDetails(null);
+      setStep("booking");
+      }
+
+    } catch (error) {
+      console.error(error);
+      alert("Error cancelling booking");
+    }
+  };
+
+
+
   const handleBookAnother = () => {
-    // Go back to the booking form, not the email page.
-    // We keep the email and the (now updated) allBookings data.
     setStep("booking");
     setBookingDetails(null);
   };
-  // --- END FIX #2 ---
 
   return (
     <>
       {step === "email" && (
         <EmailVerification
-          onVerified={handleVerified}
+          onVerified={handleVerified} // handleVerified now expects (email, data)
           onUnverified={handleUnverified}
         />
       )}
@@ -279,7 +304,9 @@ export default function BookingPage() {
       {step === "booking" && (
         <BookingForm
           email={email}
+          userName={userName} // --- NEW: Pass the name down ---
           onBookingComplete={handleBookingComplete}
+          onCancelBooking={handleCancelBooking}
           allBookings={allBookings}
         />
       )}
@@ -287,10 +314,13 @@ export default function BookingPage() {
       {step === "confirmation" && bookingDetails && (
         <BookingConfirmation
           email={email}
+          userName={userName}
           seatNumber={bookingDetails.seatNumber}
-          bookingDate={bookingDetails.date}
+          bookingDate={bookingDetails.bookingDate}
+          bookingTime={bookingDetails.bookingTime} // Pass time
           hubId={bookingDetails.hubId}
           onBookAnother={handleBookAnother}
+          onCancelBooking={() => handleCancelBooking(bookingDetails.bookingDate)} // Pass cancel
         />
       )}
 

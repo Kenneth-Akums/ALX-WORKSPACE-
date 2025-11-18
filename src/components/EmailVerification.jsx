@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import BrandLogo from "./BrandLogo";
-import "./EmailVerification.css"; // Import the CSS file
+import BrandLogo from "./BrandLogo.jsx"; // Use .jsx
+import "./EmailVerification.css"; 
 
 export default function EmailVerification({ onVerified, onUnverified }) {
   const [email, setEmail] = useState("");
@@ -11,8 +11,8 @@ export default function EmailVerification({ onVerified, onUnverified }) {
     e.preventDefault();
     setIsLoading(true);
     
-   try {
-      // --- THIS IS THE NEW LOGIC ---
+    try {
+      // Call the verification API
       const response = await fetch("/api/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -20,25 +20,22 @@ export default function EmailVerification({ onVerified, onUnverified }) {
       });
 
       if (!response.ok) {
-        // If the server itself failed, treat as unverified
-        throw new Error("Server verification failed");
+        throw new Error("Verification check failed");
       }
-
-      const data = await response.json();
-
+      
+      const data = await response.json(); // e.g., { isVerified: true, name: "Akunwanne Kenneth" }
+      
       if (data.isVerified) {
-        onVerified(email);
+        onVerified(email, data); // --- UPDATED: Pass *all* data back
       } else {
         onUnverified(email);
       }
-      // --- END OF NEW LOGIC ---
-
     } catch (error) {
       console.error("Email verification error:", error);
-      onUnverified(email); // Show modal on any error
-    } finally {
-      setIsLoading(false);
+      alert("An error occurred. Please try again.");
     }
+    
+    setIsLoading(false);
   };
 
   return (
@@ -85,10 +82,10 @@ export default function EmailVerification({ onVerified, onUnverified }) {
               {isLoading ? (
                 <>
                   <span className="spinner"><Loader2 /></span>
-                  <span>Verifying...</span>
+                  Verifying...
                 </>
               ) : (
-                <span>Continue to Booking</span>
+                "Continue to Booking"
               )}
             </button>
           </form>
