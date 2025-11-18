@@ -279,8 +279,8 @@ import SeatGrid from "./SeatGrid.jsx";
 import DaySelector from "./DaySelector.jsx";
 import HubSelector, { HUBS } from "./HubSelector.jsx";
 import BrandLogo from "./BrandLogo.jsx";
-import { format, addDays, isSameDay, parseISO } from "date-fns";
-import { Loader2, Clock, CalendarCheck } from "lucide-react"; // Added CalendarCheck
+import { format, addDays, isSameDay, parseISO, addMinutes, setHours, setMinutes, isValid } from "date-fns"; // --- ADDED: isValid
+import { Loader2, Clock, CalendarCheck, ChevronDown } from "lucide-react";
 import "./components.css";
 import "./BookingForm.css";
 
@@ -289,7 +289,7 @@ const getNextFiveWorkDays = () => {
   let currentOffset = 0;
   while (days.length < 5) {
     const date = addDays(new Date(), currentOffset);
-    if (date.getDay() !== 0) { // 0 = Sunday
+    if (date.getDay() !== 0) { 
       days.push(format(date, "yyyy-MM-dd"));
     }
     currentOffset++;
@@ -302,25 +302,50 @@ const getFirstName = (name) => {
   return name.split(" ")[0];
 };
 
+// --- NEW: Robust Time Formatter ---
+const safeFormatTime = (dateStr, timeStr) => {
+  if (!dateStr || !timeStr) return "scheduled";
+  try {
+    // Attempt to parse ISO string "2025-11-18T14:00"
+    const parsedDate = parseISO(`${dateStr}T${timeStr}`);
+    if (isValid(parsedDate)) {
+      return format(parsedDate, 'h:mm a');
+    }
+    // If parsing fails (e.g. timeStr is "2pm"), just return the original string
+    return timeStr;
+  } catch (e) {
+    return timeStr; // Fallback to showing raw data
+  }
+};
+
 const generateTimeSlots = (selectedDate) => {
   if (!selectedDate) return [];
+  
   const slots = [];
-  const startHour = 8;
-  const endHour = 20;
   const now = new Date();
-  const isToday = isSameDay(parseISO(selectedDate), now);
-  const currentHour = now.getHours();
+  // Ensure selectedDate is valid before parsing
+  const parsedDate = parseISO(selectedDate);
+  if (!isValid(parsedDate)) return [];
 
-  for (let hour = startHour; hour <= endHour; hour++) {
-    if (isToday && hour <= currentHour) continue;
+  const isToday = isSameDay(parsedDate, now);
+
+  let currentTime = setMinutes(setHours(parsedDate, 8), 0);
+  const endTime = setMinutes(setHours(parsedDate, 20), 0);
+
+  while (currentTime <= endTime) {
+    if (isToday && currentTime <= now) {
+      currentTime = addMinutes(currentTime, 15);
+      continue;
+    }
+
+    const label = format(currentTime, "h:mm a");
+    const value = format(currentTime, "HH:mm");
     
-    const displayHour = hour > 12 ? hour - 12 : hour;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const timeString = `${displayHour}:00 ${ampm}`;
-    const value = `${hour.toString().padStart(2, '0')}:00`; 
+    slots.push({ value, label });
     
-    slots.push({ value, label: timeString });
+    currentTime = addMinutes(currentTime, 15);
   }
+  
   return slots;
 };
 
@@ -392,8 +417,6 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
 
   const timeSlots = useMemo(() => generateTimeSlots(selectedDate), [selectedDate]);
 
-  // --- NEW: Logic to handle "Already Booked" state ---
-  // Check if the user is booked at the *currently selected* hub on the *selected date*
   const isBookedAtCurrentHub = myBookedSeatForThisGrid !== null && myBookedSeatForThisGrid !== undefined;
 
   const handleHubChange = (hubId) => {
@@ -408,11 +431,7 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
     setSelectedDate(date);
     setSelectedTime(""); 
     setSelectedSeat(null);
-    // Scroll to the next relevant section
-    // If booked -> Scroll to Seat Grid (skip time)
-    // If not booked -> Scroll to Time Selector
     setTimeout(() => {
-       // Use a small delay to let state update and render
        const target = isBookedAtCurrentHub ? seatSectionRef.current : timeSectionRef.current;
        target?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 100);
@@ -439,14 +458,7 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
     <div className="booking-page-container">
       <div className="booking-page-content">
         
-        {/* <div className="card">
-          <div className="card-header card-header-welcome">
-            <div className="card-logo"><BrandLogo /></div>
-            <h1 className="card-title">Welcome, <span className="text-primary">{welcomeName}</span></h1>
-          </div>
-        </div> */}
-
-          <header className="welcome-header">
+        <header className="welcome-header">
           <div className="welcome-text-group">
             <div className="welcome-brand">
                <BrandLogo className="welcome-logo" />
@@ -458,9 +470,6 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
             <p className="welcome-subtitle">Ready to book your workspace today?</p>
           </div>
         </header>
-
-
-
 
         <HubSelector
           selectedHub={selectedHub}
@@ -483,7 +492,6 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
           </div>
         )}
 
-        {/* --- LOGIC UPDATE: Only show Time Selector if NOT booked anywhere today --- */}
         {selectedHub && selectedDate && !myBookingAnywhereOnDate && (
           <div ref={timeSectionRef} className="reveal-section section-divider">
             <div className="time-selector-section">
@@ -491,17 +499,24 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
                 <Clock className="time-icon" />
                 <h3 className="time-title">Select Arrival Time</h3>
               </div>
-              <div className="time-grid">
+              
+              <div className="time-select-container">
                 {timeSlots.length > 0 ? (
-                  timeSlots.map((slot) => (
-                    <button
-                      key={slot.value}
-                      className={`time-button ${selectedTime === slot.value ? 'is-selected' : ''}`}
-                      onClick={() => handleTimeChange(slot.value)}
+                  <div className="select-wrapper">
+                    <select 
+                      value={selectedTime}
+                      onChange={(e) => handleTimeChange(e.target.value)}
+                      className="modern-time-select"
                     >
-                      {slot.label}
-                    </button>
-                  ))
+                      <option value="" disabled>Choose a time slot...</option>
+                      {timeSlots.map((slot) => (
+                        <option key={slot.value} value={slot.value}>
+                          {slot.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="select-icon" />
+                  </div>
                 ) : (
                   <div className="no-slots-message">
                     No available time slots for today.
@@ -512,14 +527,18 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
           </div>
         )}
 
-        {/* --- NEW: Information Banner if Already Booked --- */}
         {selectedHub && selectedDate && myBookingAnywhereOnDate && (
           <div className="reveal-section section-divider">
              <div className="booked-info-card">
                 <CalendarCheck className="booked-icon" />
                 <div>
                    {isBookedAtCurrentHub ? (
-                      <p><strong>You have a booking here.</strong> Your arrival time is <span>{myBookingAnywhereOnDate.bookingTime || 'scheduled'}</span>.</p>
+                      <p>
+                        <strong>You have a booking here.</strong> Your arrival time is <span>
+                          {/* --- USE SAFE FORMAT HERE --- */}
+                          {safeFormatTime(selectedDate, myBookingAnywhereOnDate.bookingTime)}
+                        </span>.
+                      </p>
                    ) : (
                       <p><strong>Conflict:</strong> You are booked at another hub for this date.</p>
                    )}
@@ -529,7 +548,6 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
           </div>
         )}
 
-        {/* --- LOGIC UPDATE: Show Seat Grid if Time Selected OR Booked Here --- */}
         {selectedHub && selectedDate && (selectedTime || isBookedAtCurrentHub) && (
           <div ref={seatSectionRef} className="reveal-section section-divider">
             <SeatGrid
@@ -544,7 +562,6 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
             <div className="booking-page-footer">
               <button
                 onClick={handleSubmit}
-                // Disable button if booked (because you can't book twice)
                 disabled={!selectedSeat || isSubmitting || !!myBookingAnywhereOnDate}
                 className="button button-primary button-lg"
                 data-testid="button-confirm-booking"
