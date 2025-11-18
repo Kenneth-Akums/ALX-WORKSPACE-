@@ -303,18 +303,39 @@ const getFirstName = (name) => {
 };
 
 // --- NEW: Robust Time Formatter ---
+// const safeFormatTime = (dateStr, timeStr) => {
+//   if (!dateStr || !timeStr) return "scheduled";
+//   try {
+//     // Attempt to parse ISO string "2025-11-18T14:00"
+//     const parsedDate = parseISO(`${dateStr}T${timeStr}`);
+//     if (isValid(parsedDate)) {
+//       return format(parsedDate, 'h:mm a');
+//     }
+//     // If parsing fails (e.g. timeStr is "2pm"), just return the original string
+//     return timeStr;
+//   } catch (e) {
+//     return timeStr; // Fallback to showing raw data
+//   }
+// };
+
+// --- SIMPLIFIED: Robust Time Formatter ---
 const safeFormatTime = (dateStr, timeStr) => {
   if (!dateStr || !timeStr) return "scheduled";
+  
   try {
-    // Attempt to parse ISO string "2025-11-18T14:00"
-    const parsedDate = parseISO(`${dateStr}T${timeStr}`);
+    // 1. Force the time to be 5 chars (e.g., "9:00" -> "09:00")
+    const normalizedTime = String(timeStr).padStart(5, '0');
+    
+    // 2. Combine with date and parse
+    const parsedDate = parseISO(`${dateStr}T${normalizedTime}`);
+    
+    // 3. Format to "9:00 AM"
     if (isValid(parsedDate)) {
       return format(parsedDate, 'h:mm a');
     }
-    // If parsing fails (e.g. timeStr is "2pm"), just return the original string
     return timeStr;
   } catch (e) {
-    return timeStr; // Fallback to showing raw data
+    return timeStr;
   }
 };
 
