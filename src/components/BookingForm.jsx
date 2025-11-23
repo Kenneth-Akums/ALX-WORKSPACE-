@@ -351,7 +351,7 @@ const generateTimeSlots = (selectedDate) => {
   const isToday = isSameDay(parsedDate, now);
 
   let currentTime = setMinutes(setHours(parsedDate, 8), 0);
-  const endTime = setMinutes(setHours(parsedDate, 20), 0);
+  const endTime = setMinutes(setHours(parsedDate, 19), 0);
 
   while (currentTime <= endTime) {
     if (isToday && currentTime <= now) {
@@ -377,7 +377,7 @@ const getGreeting = () => {
   return "Good Evening";
 };
 
-export default function BookingForm({ email, userName, onBookingComplete, onCancelBooking, allBookings = [] }) {
+export default function BookingForm({ email, userName, onBookingComplete, onCancelBooking, allBookings = [], onBackToVerify }) {
   const [selectedHub, setSelectedHub] = useState(null); 
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null); 
@@ -480,11 +480,21 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
       <div className="booking-page-content">
         
         <header className="welcome-header">
+          
           <div className="welcome-text-group">
             <div className="welcome-brand">
                <BrandLogo className="welcome-logo" />
                <span className="welcome-date">{todayDisplay}</span>
             </div>
+            {typeof onBackToVerify === 'function' && (
+              <button
+                type="button"
+                className="change-user-link"
+                onClick={() => onBackToVerify()}
+              >
+                Change user
+              </button>
+            )}
             <h1 className="welcome-title">
               {greeting}, <span className="text-highlight">{welcomeName}</span>
             </h1>
@@ -506,7 +516,7 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
               selectedDate={selectedDate}
               onSelectDate={handleDateChange}
               dayList={fiveDayList}
-              availabilityForSelectedHub={dayAvailabilityForSelectedHub}
+              availabilityByDate={dayAvailabilityForSelectedHub}
               myBookings={myBookings} 
               selectedHub={selectedHub}
             />
@@ -536,7 +546,7 @@ export default function BookingForm({ email, userName, onBookingComplete, onCanc
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="select-icon" />
+                    {/* <ChevronDown className="select-icon" /> */}
                   </div>
                 ) : (
                   <div className="no-slots-message">

@@ -118,13 +118,11 @@
 
 //     // Skip the header row (row[0]) and map the rest
 //     return values.slice(1).map(row => ({
-//       email: row[0] || '',       // Column A
-//       hubId: row[4] || '',       // Column E
-//       seatNumber: Number(row[5] || 0), // Column F
-//       bookingDate: row[6] || '', // Column G
-//       timestamp: row[7] || '',   // Column H
-//       bookingStatus: row[8] || 'Booked', // Column I
-//       bookingNotification: row[9] || 'NO' // Column J
+//       email: row[0] || '',
+//       hubId: row[1] || '',
+//       seatNumber: Number(row[2] || 0), // Ensure this is a number
+//       bookingDate: row[3] || '',
+//       timestamp: row[4] || ''
 //     }));
 //   } catch (err) {
 //     console.error("Error fetching all bookings:", err);
@@ -254,13 +252,15 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import { google } from "googleapis";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // --- START: express setup ---
 const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://alx-workspace-cyan.vercel.app" // Your Vercel URL
+  "https://alx-workspace-cyan.vercel.app"
 ];
 app.use(cors({ 
   origin: function (origin, callback) {
@@ -304,7 +304,6 @@ async function getSheetsClient() {
     throw new Error("Server auth configuration error.");
   }
   
-  // Parse the private key correctly, handling newlines
   const privateKey = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
   
   const auth = new google.auth.JWT({
@@ -313,13 +312,12 @@ async function getSheetsClient() {
     scopes: SCOPES
   });
 
-  await auth.authorize(); // Authorize the client
+  await auth.authorize();
   return google.sheets({ version: "v4", auth });
 }
 
 /**
- * --- UPDATED FOR "Welcome, Name" ---
- * Checks if an email exists and returns the user's name.
+ * Checks if an email exists in the 'ApprovedLearners' sheet.
  */
 export async function isEmailApproved(email) {
   if (!LEARNERS_SHEET_ID) {
@@ -328,7 +326,7 @@ export async function isEmailApproved(email) {
   }
   try {
     const sheets = await getSheetsClient();
-    // --- NEW: Read columns A and B ---
+    // Read both Email (A) and Name (B)
     const range = "ApprovedLearners!A:B";
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: LEARNERS_SHEET_ID,
@@ -357,6 +355,7 @@ export async function isEmailApproved(email) {
 }
 
 /**
+ * --- UPDATED: Reads BookingStatus from Column I ---
  * Fetches all bookings from the "Bookings" sheet.
  */
 export async function getAllBookings() {
@@ -386,16 +385,41 @@ export async function getAllBookings() {
     //   timestamp: row[7] || '',   // Column H
     //   bookingStatus: row[8] || 'Booked', // Column I
     //   bookingNotification: row[9] || '' // Column J
+    // Helper to parse common date formats and return yyyy-mm-dd
+    const parseToISODate = (input) => {
+      if (!input && input !== 0) return '';
+      const s = String(input).trim();
+      // yyyy-mm-dd
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      // mm/dd/yyyy or m/d/yyyy
+      const us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+      if (us) {
+        const mm = String(Number(us[1])).padStart(2, '0');
+        const dd = String(Number(us[2])).padStart(2, '0');
+        const yyyy = us[3];
+        return `${yyyy}-${mm}-${dd}`;
+      }
+      // Try Date.parse fallback
+      const parsed = new Date(s);
+      if (!isNaN(parsed.getTime())) {
+        const yyyy = parsed.getFullYear();
+        const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+        const dd = String(parsed.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      }
+      return s; // return original if unable to parse
+    };
+
     return values.slice(1).map((row, index) => ({
-      rowIndex: index + 2, 
-      email: row[0] || '',
-      hubId: row[4] || '',
+      rowIndex: index + 2,
+      email: (row[0] || '').toString().trim(),
+      hubId: (row[4] || '').toString().trim(),
       seatNumber: Number(row[5] || 0),
-      bookingDate: row[6] || '',
+      bookingDate: parseToISODate(row[6] || ''),
       // --- CHANGED: Column H is now Booking Time ---
-      bookingTime: row[7] || '', 
-      bookingStatus: row[8] || 'Booked',
-      bookingNotification: row[9] || ''
+      bookingTime: (row[7] || '').toString().trim(),
+      bookingStatus: (row[8] || 'Booked').toString().trim(),
+      bookingNotification: (row[9] || '').toString().trim()
     }));
   } catch (err) {
     console.error("Error fetching all bookings:", err);
@@ -453,20 +477,63 @@ export async function appendBooking(data) {
 export async function cancelBooking(email, date) {
   try {
     const bookings = await getAllBookings();
-    
-    const bookingToCancel = bookings.find(b => 
-      b.email.toLowerCase() === email.toLowerCase() && 
-      b.bookingDate === date &&
-      b.bookingStatus === "Booked"
-    );
+
+    // Normalize inputs
+    const targetEmail = (email || '').toLowerCase().trim();
+    const targetDate = (date || '').trim();
+
+    // Helper: parse common date formats into a Date object (date-only)
+    const parseToDateOnly = (d) => {
+      if (!d) return null;
+      const s = String(d).trim();
+      // yyyy-mm-dd
+      const isoMatch = /^\d{4}-\d{2}-\d{2}$/.exec(s);
+      if (isoMatch) {
+        const [y, m, day] = s.split('-').map(Number);
+        return new Date(y, m - 1, day);
+      }
+      // mm/dd/yyyy or m/d/yyyy
+      const usMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+      if (usMatch) {
+        const month = Number(usMatch[1]);
+        const day = Number(usMatch[2]);
+        const year = Number(usMatch[3]);
+        return new Date(year, month - 1, day);
+      }
+      // Fallback: try Date.parse
+      const parsed = new Date(s);
+      if (!isNaN(parsed.getTime())) {
+        return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+      }
+      return null;
+    };
+
+    const targetDateObj = parseToDateOnly(targetDate);
+
+    // Try to find a matching booking. Be forgiving with bookingStatus casing/whitespace
+    const bookingToCancel = bookings.find(b => {
+      const bEmail = (b.email || '').toLowerCase().trim();
+      const bDateRaw = (b.bookingDate || '').toString().trim();
+      const bStatus = (b.bookingStatus || '').toLowerCase().trim();
+
+      // Parse both booking date and target date to date-only objects and compare numeric time
+      const bDateObj = parseToDateOnly(bDateRaw);
+      if (!bDateObj || !targetDateObj) return false;
+      // Normalize to midnight and compare epoch
+      bDateObj.setHours(0,0,0,0);
+      targetDateObj.setHours(0,0,0,0);
+
+      return bEmail === targetEmail && bDateObj.getTime() === targetDateObj.getTime() && bStatus === 'booked';
+    });
 
     if (!bookingToCancel) {
+      console.error('cancelBooking: no matching booked row found', { targetEmail, targetDate, bookingsCount: bookings.length });
       throw new Error("No active booking found to cancel.");
     }
 
     const sheets = await getSheetsClient();
     const range = `Bookings!I${bookingToCancel.rowIndex}`; // Column I is Status
-    
+
     await sheets.spreadsheets.values.update({
       spreadsheetId: BOOKINGS_SHEET_ID,
       range: range,

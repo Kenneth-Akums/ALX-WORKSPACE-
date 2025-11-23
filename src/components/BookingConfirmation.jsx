@@ -18,7 +18,8 @@ export default function BookingConfirmation({
   bookingTime, // NEW PROP
   hubId,
   onBookAnother,
-  onCancelBooking // NEW PROP
+  onCancelBooking, // NEW PROP
+  onBackToVerify
 }) {
   const formattedDate = format(parse(bookingDate, "yyyy-MM-dd", new Date()), "EEEE, MMMM d, yyyy");
   const welcomeName = getFirstName(userName) || email;
@@ -31,6 +32,11 @@ export default function BookingConfirmation({
     <div className="confirmation-page">
       <div className="card confirmation-card">
         <div className="card-header confirmation-header">
+          {typeof onBackToVerify === 'function' && (
+            <div style={{ marginLeft: 'auto' }}>
+              <button className="change-user-link" onClick={() => onBackToVerify()}>Change user</button>
+            </div>
+          )}
           <div className="confirmation-icon-wrapper">
             <CheckCircle2 className="confirmation-icon" />
           </div>

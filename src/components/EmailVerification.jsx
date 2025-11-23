@@ -12,7 +12,6 @@ export default function EmailVerification({ onVerified, onUnverified }) {
     setIsLoading(true);
     
     try {
-      // Call the verification API
       const response = await fetch("/api/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -23,10 +22,12 @@ export default function EmailVerification({ onVerified, onUnverified }) {
         throw new Error("Verification check failed");
       }
       
-      const data = await response.json(); // e.g., { isVerified: true, name: "Akunwanne Kenneth" }
+      // The API now returns { isVerified: true, name: "Akunwanne Kenneth" }
+      const data = await response.json(); 
       
       if (data.isVerified) {
-        onVerified(email, data); // --- UPDATED: Pass *all* data back
+        // FIX: Pass the email AND the full data object (which contains the name)
+        onVerified(email, data); 
       } else {
         onUnverified(email);
       }

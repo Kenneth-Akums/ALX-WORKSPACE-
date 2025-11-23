@@ -65,9 +65,9 @@ import "./components.css";
 import "./HubSelector.css"; 
 
 export const HUBS = [
-  { id: "costain", name: "Costain Hub", location: "Costain", totalSeats: 100 },
-  { id: "ralno", name: "Ralno Hub", location: "Ralno", totalSeats: 40 },
-  { id: "ajah", name: "Ajah Hub", location: "Ajah", totalSeats: 50 },
+  { id: "Costain", name: "Costain Hub", location: "Costain", totalSeats: 100 },
+  { id: "Akowonjo", name: "Akowonjo Hub", location: "Akowonjo", totalSeats: 40 },
+  { id: "Ajah", name: "Ajah Hub", location: "Ajah", totalSeats: 50 },
 ];
 
 export default function HubSelector({ 

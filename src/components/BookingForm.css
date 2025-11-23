@@ -13,19 +13,7 @@
   gap: 2rem; /* space-y-8 */
 }
 
-/* .card-header-welcome {
-  text-align: center;
-} */
 
-/* .card-header-welcome .card-logo img {
-  height: 2.5rem; 
-  margin-inline: auto;
-}
-
-.card-header-welcome .card-title {
-  font-size: 1.5rem; 
-  line-height: 2rem;
-} */
 
 /* --- Professional Welcome Header --- */
 .welcome-header {
@@ -40,6 +28,7 @@
   position: relative;
   overflow: hidden;
 }
+ 
 
 /* Optional: A decorative circle in the background for depth */
 .welcome-header::after {
@@ -66,6 +55,37 @@
   align-items: center;
   gap: 1rem;
   margin-bottom: 0.5rem;
+}
+
+/* Small change-user control in header (button-like, responsive) */
+.change-user-link {
+  justify-self: end; /* align right in the grid header */
+  background: transparent;
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.375rem;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+.change-user-link:hover {
+  background-color: hsla(var(--primary), 0.06);
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+  transform: translateY(-1px);
+}
+
+/* Mobile: make it full-width and stack under brand */
+@media (max-width: 640px) {
+  .change-user-link {
+    justify-self: start;
+    width: 100%;
+    display: inline-block;
+    text-align: center;
+    margin-top: 0.5rem;
+  }
 }
 
 .welcome-logo {
