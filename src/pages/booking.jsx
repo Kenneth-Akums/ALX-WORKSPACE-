@@ -209,6 +209,8 @@ import EmailVerification from "../components/EmailVerification.jsx";
 import SignupModal from "../components/SignupModal.jsx";
 import BookingForm from "../components/BookingForm.jsx";
 import BookingConfirmation from "../components/BookingConfirmation.jsx";
+import ConfirmModal from "../components/ConfirmModal.jsx";
+import Toast from "../components/Toast.jsx";
 
 export default function BookingPage() {
   // --- FIX 1: LAZY INITIALIZATION (Reads LocalStorage BEFORE first render) ---
@@ -229,6 +231,17 @@ export default function BookingPage() {
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [bookingDetails, setBookingDetails] = useState(null);
   const [allBookings, setAllBookings] = useState([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingCancelDate, setPendingCancelDate] = useState(null);
+  const [toasts, setToasts] = useState([]);
+
+  const pushToast = (toast) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+    setToasts(t => [...t, { id, duration: toast.duration !== undefined ? toast.duration : 4000, ...toast }]);
+    return id;
+  };
+
+  const removeToast = (id) => setToasts(t => t.filter(x => x.id !== id));
 
   // Stable fetch function
   const fetchBookings = useCallback(async () => {
@@ -298,7 +311,7 @@ export default function BookingPage() {
           errorMessage = errorData.message || errorMessage;
           
           if (response.status === 409) {
-            alert(errorMessage);
+            pushToast({ type: 'error', title: 'Booking conflict', message: errorMessage });
             await fetchBookings(); 
             return; 
           }
@@ -312,6 +325,7 @@ export default function BookingPage() {
 
       setBookingDetails({ seatNumber, bookingDate: date, hubId, bookingTime });
       setStep("confirmation");
+      pushToast({ type: 'success', title: 'Booking confirmed', message: `Seat ${seatNumber} reserved for ${date}` });
 
       setAllBookings(prev => {
         if (isIdempotentHit) {
@@ -324,13 +338,20 @@ export default function BookingPage() {
 
     } catch (error) {
       console.error("Failed to submit booking:", error);
-      alert(error.message); 
+      pushToast({ type: 'error', title: 'Booking failed', message: error.message || 'Could not complete booking.' });
     }
   };
 
-  const handleCancelBooking = async (dateToCancel) => {
-    if (!window.confirm(`Are you sure you want to cancel this booking for ${dateToCancel}?`)) return;
-    
+  // Open confirmation modal instead of native confirm
+  const handleCancelBooking = (dateToCancel) => {
+    setPendingCancelDate(dateToCancel);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    const dateToCancel = pendingCancelDate;
+    setConfirmOpen(false);
+    setPendingCancelDate(null);
     try {
       const response = await fetch("/api/cancel-booking", {
         method: "POST",
@@ -340,17 +361,16 @@ export default function BookingPage() {
 
       if (!response.ok) throw new Error("Failed to cancel");
 
-      alert("Booking Cancelled Successfully");
-      await fetchBookings(); 
-      
+      // friendly success UI
+      await fetchBookings();
+      pushToast({ type: 'success', title: 'Booking cancelled', message: `Cancelled booking for ${dateToCancel}` });
       if (step === "confirmation") {
         setBookingDetails(null);
         setStep("booking");
       }
-
     } catch (error) {
       console.error(error);
-      alert("Error cancelling booking");
+      pushToast({ type: 'error', title: 'Cancel failed', message: 'Error cancelling booking' });
     }
   };
 
@@ -376,6 +396,7 @@ export default function BookingPage() {
         <EmailVerification
           onVerified={handleVerified}
           onUnverified={handleUnverified}
+          showToast={(t) => pushToast(t)}
         />
       )}
 
@@ -401,7 +422,6 @@ export default function BookingPage() {
           onBookAnother={handleBookAnother}
           onCancelBooking={() => handleCancelBooking(bookingDetails.bookingDate)}
           onBackToVerify={handleBackToVerification}
-        
         />
       )}
 
@@ -410,6 +430,18 @@ export default function BookingPage() {
         onClose={() => { setShowSignupModal(false); setEmail(""); }}
         email={email}
       />
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title={`Cancel booking?`}
+        description={pendingCancelDate ? `Are you sure you want to cancel this booking for ${pendingCancelDate}?` : 'Are you sure?'}
+        confirmLabel="Yes, cancel"
+        cancelLabel="Keep booking"
+        destructive={true}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => { setConfirmOpen(false); setPendingCancelDate(null); }}
+      />
+      <Toast toasts={toasts} onRemove={removeToast} />
     </>
   );
 }

@@ -1,0 +1,107 @@
+/* Overlay */
+.cm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(3px);
+  padding: 1rem;
+  animation: cm-fade-in 160ms ease-out;
+}
+
+@keyframes cm-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal card */
+.cm-content {
+  width: 100%;
+  max-width: 28rem;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.3);
+  transform: translateY(6px) scale(0.995);
+  animation: cm-pop 180ms cubic-bezier(.2,.9,.3,1) forwards;
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+@keyframes cm-pop {
+  to { transform: translateY(0) scale(1); }
+}
+
+.cm-close {
+  position: absolute;
+  right: 0.6rem;
+  top: 0.6rem;
+  background: transparent;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+}
+
+.cm-icon-wrapper {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin: 0 auto;
+  border-radius: 9999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: hsla(var(--primary), 0.09);
+}
+
+.cm-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: hsl(var(--primary));
+}
+
+.cm-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.cm-desc {
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.cm-actions {
+  display:flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  justify-content: center;
+}
+
+/* Danger variant */
+.cm-destructive .cm-icon-wrapper {
+  background: hsla(var(--destructive), 0.08);
+}
+.cm-destructive .cm-icon {
+  color: hsl(var(--destructive));
+}
+
+/* Button variants: rely on existing .button classes; add danger */
+.button.button-danger {
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border: 1px solid hsl(var(--destructive));
+}
+
+@media (max-width: 520px) {
+  .cm-content { padding: 1rem; max-width: 95%; }
+  .cm-actions { flex-direction: column; }
+  .button { width: 100%; }
+}

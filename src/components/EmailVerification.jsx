@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import BrandLogo from "./BrandLogo.jsx"; // Use .jsx
 import "./EmailVerification.css"; 
 
-export default function EmailVerification({ onVerified, onUnverified }) {
+export default function EmailVerification({ onVerified, onUnverified, showToast }) {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -33,7 +33,7 @@ export default function EmailVerification({ onVerified, onUnverified }) {
       }
     } catch (error) {
       console.error("Email verification error:", error);
-      alert("An error occurred. Please try again.");
+      if (showToast) showToast({ type: 'error', title: 'Verification failed', message: 'An error occurred. Please try again.' });
     }
     
     setIsLoading(false);
