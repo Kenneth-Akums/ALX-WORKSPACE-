@@ -273,12 +273,15 @@ export default function BookingPage() {
   };
 
   const handleBookingComplete = async (seatNumber, date, hubId, bookingTime) => {
+    // generate client idempotency key
+    const clientBookingId = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
     const bookingData = {
       email: email,
       seatNumber: seatNumber,
       bookingDate: date,
       bookingTime: bookingTime,
       hubId: hubId,
+      clientBookingId,
     };
 
     try {
@@ -302,11 +305,22 @@ export default function BookingPage() {
         } catch (e) {}
         throw new Error(errorMessage);
       }
-      
+
+      const respJson = await response.json();
+      const isIdempotentHit = respJson && respJson.existing;
+      const bookingRecord = isIdempotentHit ? respJson.existing : { ...bookingData, seatNumber: Number(seatNumber), bookingStatus: "Booked" };
+
       setBookingDetails({ seatNumber, bookingDate: date, hubId, bookingTime });
       setStep("confirmation");
-      
-      setAllBookings(prev => [...prev, { ...bookingData, seatNumber: Number(seatNumber), bookingStatus: "Booked" }]);
+
+      setAllBookings(prev => {
+        if (isIdempotentHit) {
+          const already = prev.find(b => (b.clientBookingId || '') === bookingRecord.clientBookingId);
+          if (already) return prev;
+          return [...prev, bookingRecord];
+        }
+        return [...prev, bookingRecord];
+      });
 
     } catch (error) {
       console.error("Failed to submit booking:", error);

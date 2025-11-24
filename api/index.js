@@ -287,35 +287,108 @@ const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
-/**
- * Authenticates and returns a Google Sheets API client
- */
-async function getSheetsClient() {
-  console.log("Checking for Google auth variables...");
-  if (!GOOGLE_CLIENT_EMAIL) {
-    console.error("GOOGLE_CLIENT_EMAIL is NOT SET.");
-  }
-  if (!GOOGLE_PRIVATE_KEY) {
-    console.error("GOOGLE_PRIVATE_KEY is NOT SET.");
-  }
+// --- Token caching and retry configuration (works on serverless warm instances) ---
+let cachedJwtClient = null;
+let cachedAccessToken = null;
+let tokenExpiry = 0; // epoch ms when token expires
+const TOKEN_EXPIRY_BUFFER_MS = 60 * 1000; // refresh if within 60s of expiry
+const AUTHORIZE_MAX_RETRIES = 3;
+const READ_MAX_RETRIES = 3;
+const READ_BASE_DELAY_MS = 250; // ms
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isRetryableError(err) {
+  if (!err) return false;
+  // Network errors
+  if (err.code && (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET' || err.code === 'ENOTFOUND')) return true;
+  // HTTP status codes from Google API
+  const status = err?.response?.status || err?.status;
+  if (status === 429) return true; // rate limit
+  if (status >= 500 && status < 600) return true; // server errors
+  return false;
+}
+
+function getJwtClient() {
+  if (cachedJwtClient) return cachedJwtClient;
   if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY) {
-    console.error("Missing Google auth environment variables");
-    throw new Error("Server auth configuration error.");
+    throw new Error('Missing Google auth configuration for JWT creation');
   }
-  
   const privateKey = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
-  
-  const auth = new google.auth.JWT({
+  cachedJwtClient = new google.auth.JWT({
     email: GOOGLE_CLIENT_EMAIL,
     key: privateKey,
     scopes: SCOPES
   });
-
-  await auth.authorize();
-  return google.sheets({ version: "v4", auth });
+  return cachedJwtClient;
 }
 
+async function ensureAuthorized() {
+  const client = getJwtClient();
+  const now = Date.now();
+  if (cachedAccessToken && tokenExpiry && now < tokenExpiry - TOKEN_EXPIRY_BUFFER_MS) {
+    return cachedAccessToken;
+  }
+
+  // Try to authorize with limited retries on transient errors
+  let attempt = 0;
+  let lastErr = null;
+  while (attempt < AUTHORIZE_MAX_RETRIES) {
+    try {
+      const resp = await client.authorize();
+      if (!resp || !resp.access_token) {
+        throw new Error('No access_token received from authorize');
+      }
+      cachedAccessToken = resp.access_token;
+      // resp.expiry_date may be absolute ms since epoch or undefined; fallback to 1 hour
+      if (resp.expiry_date && typeof resp.expiry_date === 'number') {
+        tokenExpiry = resp.expiry_date;
+      } else {
+        tokenExpiry = Date.now() + (60 * 60 * 1000);
+      }
+      return cachedAccessToken;
+    } catch (err) {
+      lastErr = err;
+      attempt += 1;
+      const delay = READ_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+      console.error(`ensureAuthorized attempt ${attempt} failed:`, err && (err.message || err));
+      if (attempt >= AUTHORIZE_MAX_RETRIES || !isRetryableError(err)) break;
+      await sleep(delay);
+    }
+  }
+  console.error('Failed to authorize Google JWT after retries', lastErr);
+  throw lastErr || new Error('Failed to authorize Google client');
+}
+
+async function getSheetsClient() {
+  // Ensure client exists and is authorized (this keeps token requests minimal)
+  await ensureAuthorized();
+  const client = getJwtClient();
+  return google.sheets({ version: 'v4', auth: client });
+}
+
+async function readWithRetries(fn, options = {}) {
+  const maxRetries = options.maxRetries || READ_MAX_RETRIES;
+  let attempt = 0;
+  let lastErr = null;
+  while (attempt < maxRetries) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      attempt += 1;
+      const status = err?.response?.status || err?.status;
+      console.error(`readWithRetries attempt ${attempt} failed:`, err && (err.message || err), 'status:', status);
+      if (attempt >= maxRetries || !isRetryableError(err)) break;
+      const delay = READ_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+      await sleep(delay);
+    }
+  }
+  throw lastErr || new Error('Read failed after retries');
+}
+/** (getSheetsClient is implemented above with token caching and retries) */
 /**
  * Checks if an email exists in the 'ApprovedLearners' sheet.
  */
@@ -328,10 +401,10 @@ export async function isEmailApproved(email) {
     const sheets = await getSheetsClient();
     // Read both Email (A) and Name (B)
     const range = "ApprovedLearners!A:B";
-    const response = await sheets.spreadsheets.values.get({
+    const response = await readWithRetries(() => sheets.spreadsheets.values.get({
       spreadsheetId: LEARNERS_SHEET_ID,
       range: range,
-    });
+    }));
     const values = response.data.values;
     if (!values || values.length === 0) {
       return { isVerified: false, name: null };
@@ -365,11 +438,11 @@ export async function getAllBookings() {
   }
   try {
     const sheets = await getSheetsClient();
-    const range = "Bookings!A:J"; // Get all data up to Column J
-    const response = await sheets.spreadsheets.values.get({
+    const range = "Bookings!A:M"; // Get all data up to Column M (includes clientBookingId and serverBookingId)
+    const response = await readWithRetries(() => sheets.spreadsheets.values.get({
       spreadsheetId: BOOKINGS_SHEET_ID,
       range: range,
-    });
+    }));
     const values = response.data.values;
     
     if (!values || values.length <= 1) { // <= 1 to account for header row
@@ -419,7 +492,8 @@ export async function getAllBookings() {
       // --- CHANGED: Column H is now Booking Time ---
       bookingTime: (row[7] || '').toString().trim(),
       bookingStatus: (row[8] || 'Booked').toString().trim(),
-      bookingNotification: (row[9] || '').toString().trim()
+      clientBookingId: (row[11] || '').toString().trim(), // Column L
+      serverBookingId: (row[12] || '').toString().trim() // Column M
     }));
   } catch (err) {
     console.error("Error fetching all bookings:", err);
@@ -437,32 +511,83 @@ export async function appendBooking(data) {
   }
   try {
     const sheets = await getSheetsClient();
-    
+
+    // Create a small server-side booking id to detect our own appended row during post-check
+    const bookingId = data.bookingId || `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+
     // Writes `null` to B, C, D to preserve your formulas
-    const values = [[ 
+    const clientBookingId = data.clientBookingId || data.bookingId || '';
+
+    const values = [[
       data.email,      // A: Email
-      null,              // B: Name (preserves formula)
-      null,              // C: Program (preserves formula)
-      null,              // D: Phone (preserves formula)
+      null,            // B: Name (preserves formula)
+      null,            // C: Program (preserves formula)
+      null,            // D: Phone (preserves formula)
       data.hubId,      // E: Hub
       data.seatNumber, // F: SeatNumber
-      data.bookingDate,  // G: BookingDate
-      data.bookingTime,         // H: Timestamp
-      "Booked",          // I: BookingStatus
-      ""               // J: BookingNotification
+      data.bookingDate, // G: BookingDate
+      data.bookingTime, // H: Timestamp
+      "Booked",       // I: BookingStatus
+      "",             // J: unused/reserved
+      null,            // K: reserved
+      clientBookingId, // L: client-supplied idempotency key
+      bookingId        // M: serverBookingId (diagnostic)
     ]];
-    
+
+    // Do not retry writes automatically. If this append fails, bubble the error up for the caller.
     await sheets.spreadsheets.values.append({
       spreadsheetId: BOOKINGS_SHEET_ID,
-      range: "Bookings!A:J", // Write to all 10 columns
+      range: "Bookings!A:M", // Write to columns A-M
       valueInputOption: "USER_ENTERED",
       requestBody: { values: values },
     });
+
+    // Post-append verification: ensure this seat is not double-booked. We fetch fresh bookings.
+    const refreshed = await getAllBookings();
+    const matches = refreshed.filter(b => b.hubId === data.hubId && b.seatNumber === Number(data.seatNumber) && b.bookingDate === data.bookingDate && b.bookingStatus === 'Booked');
+
+    if (matches.length > 1) {
+      // Find our appended row by clientBookingId (preferred) or bookingId (fallback)
+      const ourRow = (clientBookingId && clientBookingId.trim())
+        ? refreshed.find(r => (r.clientBookingId || '') === clientBookingId)
+        : refreshed.find(r => (r.serverBookingId || '') === bookingId);
+      // If our row exists and it's not the earliest (i.e., someone else already had this seat), roll back our row
+      if (ourRow) {
+        // Cancel the appended row to avoid double-booking
+        await updateRowStatus(ourRow.rowIndex, 'Cancelled');
+        console.error('appendBooking: concurrent booking detected, rolled back our row', { bookingId, clientBookingId, hubId: data.hubId, seatNumber: data.seatNumber, bookingDate: data.bookingDate });
+        const e = new Error('Concurrent booking detected. Your booking was not saved. Please refresh and try again.');
+        e.code = 'CONCURRENT_BOOKING';
+        throw e;
+      } else {
+        // We couldn't identify our row — fail safe: alert
+        console.error('appendBooking: duplicate booking detected but unable to find our appended row', { hubId: data.hubId, seatNumber: data.seatNumber, bookingDate: data.bookingDate });
+        const e = new Error('Concurrent booking detected. Please refresh and try again.');
+        e.code = 'CONCURRENT_BOOKING';
+        throw e;
+      }
+    }
+
     return { success: true };
   } catch (err) {
     console.error("Error appending data to Google Sheet:", err);
     throw new Error(err.message || "Failed to save booking.");
   }
+}
+
+/**
+ * Updates column I (BookingStatus) for a specific rowIndex.
+ */
+async function updateRowStatus(rowIndex, status) {
+  if (!BOOKINGS_SHEET_ID) throw new Error('Booking Sheet configuration is missing.');
+  const sheets = await getSheetsClient();
+  const range = `Bookings!I${rowIndex}`; // Column I
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: BOOKINGS_SHEET_ID,
+    range: range,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [[status]] }
+  });
 }
 // --- END: googleSheets.js logic ---
 
@@ -531,15 +656,8 @@ export async function cancelBooking(email, date) {
       throw new Error("No active booking found to cancel.");
     }
 
-    const sheets = await getSheetsClient();
-    const range = `Bookings!I${bookingToCancel.rowIndex}`; // Column I is Status
-
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: BOOKINGS_SHEET_ID,
-      range: range,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [["Cancelled"]] }
-    });
+    // Use shared helper to update booking status
+    await updateRowStatus(bookingToCancel.rowIndex, 'Cancelled');
 
     return { success: true };
   } catch (err) {
@@ -640,15 +758,25 @@ app.post("/api/verify-email", async (req, res, next) => {
  */
 app.post("/api/book-seat", async (req, res, next) => {
   try {
-    const { email, hubId, seatNumber, bookingDate, bookingTime } = req.body;
+    const { email, hubId, seatNumber, bookingDate, bookingTime, clientBookingId } = req.body;
     if (!email || !hubId || !seatNumber || !bookingDate || !bookingTime) {
       return res.status(400).json({ message: "Missing required booking data." });
     }
 
     const seatNum = Number(seatNumber);
 
+
     console.log("Checking for conflicts...");
     const allBookings = await getAllBookings();
+
+    // Idempotency: if client provided a clientBookingId, return existing booking if present
+    if (clientBookingId && clientBookingId.trim()) {
+      const existing = allBookings.find(b => (b.clientBookingId || '') === clientBookingId && b.bookingStatus === 'Booked');
+      if (existing) {
+        console.log('Idempotent request: clientBookingId already present, returning existing booking');
+        return res.status(200).json({ success: true, existing });
+      }
+    }
 
     // CHECK 1: Has this *user* already "Booked" a seat on this *day* (at ANY hub)?
     const userConflict = allBookings.find(
@@ -679,9 +807,16 @@ app.post("/api/book-seat", async (req, res, next) => {
     }
 
     console.log("No conflict. Appending booking...");
-    await appendBooking({ email, hubId, seatNumber: seatNum, bookingDate, bookingTime });
-    
-    res.status(201).json({ success: true, data: req.body });
+    try {
+      await appendBooking({ email, hubId, seatNumber: seatNum, bookingDate, bookingTime, clientBookingId });
+      res.status(201).json({ success: true, data: req.body });
+    } catch (err) {
+      // If a concurrent booking was detected and we rolled back, surface as 409
+      if (err && err.code === 'CONCURRENT_BOOKING') {
+        return res.status(409).json({ message: err.message || 'Concurrent booking detected.' });
+      }
+      throw err;
+    }
 
   } catch (err) {
     next(err);
